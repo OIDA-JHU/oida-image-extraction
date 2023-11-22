@@ -127,12 +127,14 @@ if __name__ == "__main__":
     parser.add_argument(
         dest="inputs", 
         nargs="+", 
-        help="Any number and mixture of Powerpoint and Excel files to process (or zip/tar files in archive mode)"
+        help="Any number and mixture of Powerpoint and Excel files to process (or zip/tar files in archive mode)",
     )
     parser.add_argument("--output", dest="output", help="Zip file to append extracted images to (will be created if "
                                                         "necessary)", required=True)
-    parser.add_argument("--input_dir", dest="input_dir", help="A top-level directory which will go through all sub "
-                                                              "folders and process any files in those folders")
+    parser.add_argument("--input_dir", dest="input_dir",
+                        help="A boolean value whether the inputs is a list of file(s) or list of directories.",
+                        default="FALSE",
+                        choices=["TRUE", "FALSE", "true", "false"])
     parser.add_argument("--start", dest="start", default=0, type=int, help="Which image index to start saving at")
     parser.add_argument("--count", dest="count",  type=int, help="How many images to save")
     parser.add_argument("--image_extensions", dest="image_extensions", nargs="*", default=[".jpg", ".jpeg", ".png"])
@@ -154,24 +156,48 @@ if __name__ == "__main__":
     current_index = 0
     try:
         with zipfile.ZipFile(args.output, "w") as ofd:
-            for fname in args.inputs:
-                logger.info("Processing top-level file '%s'", fname)
-                with open(fname, "rb") as ifd:
-                    logger.info("Opened top level file '%s'", fname)
-                    current_index = process_file(
-                        ofd,
-                        current_index,
-                        fname,
-                        fhandle=ifd,
-                        temp_path=temp_path, 
-                        image_exts=args.image_extensions,
-                        zip_exts=args.zip_extensions,
-                        old_exts=args.old_extensions,
-                        tar_exts=args.tar_extensions,
-                        min_index=args.start,
-                        max_index=args.start + args.count if args.count else None
-                    )
-                    logger.info("Done processing top-level file '%s'", fname)
+            if args.input_dir == 'FALSE':
+                for fname in args.inputs:
+                    logger.info("Processing individual top-level file '%s'", fname)
+                    with open(fname, "rb") as ifd:
+                        logger.info("Opened top level file '%s'", fname)
+                        current_index = process_file(
+                            ofd,
+                            current_index,
+                            fname,
+                            fhandle=ifd,
+                            temp_path=temp_path,
+                            image_exts=args.image_extensions,
+                            zip_exts=args.zip_extensions,
+                            old_exts=args.old_extensions,
+                            tar_exts=args.tar_extensions,
+                            min_index=args.start,
+                            max_index=args.start + args.count if args.count else None
+                        )
+                        logger.info("Done processing top-level file '%s'", fname)
+            elif args.input_dir == 'TRUE':
+                logger.info("Processing input directory")
+                for dir in args.inputs:
+                    for dirpath, dirnames, filenames in os.walk(dir):
+                        for file_name in filenames:
+                            file_path = os.path.join(dirpath, file_name)
+                            with open(file_path, "rb") as ifd:
+                                logger.info("Open file in input directory '%s'", file_path)
+                                current_index = process_file(
+                                    ofd,
+                                    current_index,
+                                    file_path,
+                                    fhandle=ifd,
+                                    temp_path=temp_path,
+                                    image_exts=args.image_extensions,
+                                    zip_exts=args.zip_extensions,
+                                    old_exts=args.old_extensions,
+                                    tar_exts=args.tar_extensions,
+                                    min_index=args.start,
+                                    max_index=args.start + args.count if args.count else None
+                                )
+            else:
+                logger.error("No specified input directory or file names.")
     except Exception as e:
         raise e
     finally:
