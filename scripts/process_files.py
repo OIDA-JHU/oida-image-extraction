@@ -129,13 +129,17 @@ if __name__ == "__main__":
         nargs="+", 
         help="Any number and mixture of Powerpoint and Excel files to process (or zip/tar files in archive mode)"
     )
-    parser.add_argument("--output", dest="output", help="Zip file to append extracted images to (will be created if necessary)", required=True)
+    parser.add_argument("--output", dest="output", help="Zip file to append extracted images to (will be created if "
+                                                        "necessary)", required=True)
+    parser.add_argument("--input_dir", dest="input_dir", help="A top-level directory which will go through all sub "
+                                                              "folders and process any files in those folders")
     parser.add_argument("--start", dest="start", default=0, type=int, help="Which image index to start saving at")
     parser.add_argument("--count", dest="count",  type=int, help="How many images to save")
     parser.add_argument("--image_extensions", dest="image_extensions", nargs="*", default=[".jpg", ".jpeg", ".png"])
     parser.add_argument("--zip_extensions", dest="zip_extensions", nargs="*", default=[".zip", ".xlsx", ".pptx"])
     parser.add_argument("--old_extensions", dest="old_extensions", nargs="*", default=[".ppt", ".xls"])
-    parser.add_argument("--tar_extensions", dest="tar_extensions", nargs="*", default=[".tar", ".tgz", ".tbz2", ".tar.bz2", ".tar.gz"])
+    parser.add_argument("--tar_extensions", dest="tar_extensions", nargs="*",
+                        default=[".tar", ".tgz", ".tbz2", ".tar.bz2", ".tar.gz"])
     parser.add_argument("--log_level", dest="log_level", choices=["DEBUG", "INFO", "WARN", "ERROR"], default="INFO")
     args = parser.parse_args()
 
@@ -153,6 +157,7 @@ if __name__ == "__main__":
             for fname in args.inputs:
                 logger.info("Processing top-level file '%s'", fname)
                 with open(fname, "rb") as ifd:
+                    logger.info("Opened top level file '%s'", fname)
                     current_index = process_file(
                         ofd,
                         current_index,
@@ -166,6 +171,7 @@ if __name__ == "__main__":
                         min_index=args.start,
                         max_index=args.start + args.count if args.count else None
                     )
+                    logger.info("Done processing top-level file '%s'", fname)
     except Exception as e:
         raise e
     finally:
