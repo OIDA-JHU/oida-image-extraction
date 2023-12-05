@@ -5,6 +5,7 @@ import os.path
 import os
 import argparse
 import shlex
+import time
 from glob import glob
 import logging
 import zipfile
@@ -121,8 +122,14 @@ def process_file(
     return current_index
 
 
-if __name__ == "__main__":
+def format_duration(seconds):
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{int(hours)}h {int(minutes)}m {seconds:.2f}s"
 
+
+if __name__ == "__main__":
+    start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument(
         dest="inputs", 
@@ -203,3 +210,5 @@ if __name__ == "__main__":
     finally:
         # Clean up temporary path used for hachoir subprocesses.
         shutil.rmtree(temp_path)
+
+    logger.info("Image extraction run time: " + format_duration(time.time() - start_time))
