@@ -203,6 +203,7 @@ if __name__ == "__main__":
                                     min_index=args.start,
                                     max_index=args.start + args.count if args.count else None
                                 )
+                                logger.info("Processed file at index: %s", current_index)
             else:
                 logger.error("No specified input directory or file names.")
     except Exception as e:
