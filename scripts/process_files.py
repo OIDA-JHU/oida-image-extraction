@@ -45,22 +45,30 @@ def process_file(
         logger.debug("Processing file '%s'", fname)
         if ext in zip_exts:
             logger.debug("Recursively processing a zip file")
-            with zipfile.ZipFile(fhandle, "r") as nested_ifd:
-                for nested_fname in nested_ifd.namelist():
-                    current_index = process_file(
-                        final_ofd,
-                        current_index,
-                        nested_fname,
-                        nested_ifd.open(nested_fname, "r"), 
-                        prefix=name, 
-                        temp_path=temp_path,
-                        min_index=min_index,
-                        max_index=max_index,
-                        image_exts=image_exts,
-                        zip_exts=zip_exts,
-                        old_exts=old_exts,
-                        tar_exts=tar_exts
-                    )
+            try:
+                with zipfile.ZipFile(fhandle, "r") as nested_ifd:
+                    for nested_fname in nested_ifd.namelist():
+                        current_index = process_file(
+                            final_ofd,
+                            current_index,
+                            nested_fname,
+                            nested_ifd.open(nested_fname, "r"),
+                            prefix=name,
+                            temp_path=temp_path,
+                            min_index=min_index,
+                            max_index=max_index,
+                            image_exts=image_exts,
+                            zip_exts=zip_exts,
+                            old_exts=old_exts,
+                            tar_exts=tar_exts
+                        )
+            except zipfile.BadZipFile as bad_zip_error:
+                logger.info("Unable to open archive at index at %s for file %s. Err msg: %s",
+                            current_index, name, bad_zip_error)
+            except Exception as unknown_error:
+                logger.info("Unknown error opening archive at index at %s for file %s. Err msg: %s",
+                            current_index, name, unknown_error)
+
         elif ext in old_exts:
             logger.debug("Treating '%s' as old Microsoft format", fname)
             input_fname = os.path.join(temp_path, os.path.basename(fname))
