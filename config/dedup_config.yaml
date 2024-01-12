@@ -1,0 +1,8 @@
+data_output:
+  matching_images_csv_dir: 'C:\oida_deduplicate\data'
+  matching_images_csv_filename: 'duplicated_images.csv'
+  tmp_working_dir: 'C:\oida_deduplicate\tmp'
+  image_output_dir: 'C:\oida_deduplicate\data\image_output'
+  image_output_filename: 'deduped_images_output.zip'
+  dedup_log_file_dir: 'C:\oida_deduplicate\data'
+  dedup_log_file_name: 'dedup_log_file.txt'
