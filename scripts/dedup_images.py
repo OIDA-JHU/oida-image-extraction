@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import sys
 import tempfile
 
 import yaml
@@ -22,9 +23,18 @@ def init_file_structure(file_path_config):
     os.makedirs(file_path_config['data_output']['image_output_dir'], exist_ok=True)
     os.makedirs(file_path_config['data_output']['dedup_log_file_dir'], exist_ok=True)
 
+def removeFilesFromDir(dir_path):
+    for file_name in os.listdir(dir_path):
+        file_path = os.path.join(dir_path, file_name)
+        if os.path.isfile(file_path) or os.path.islink(file_path):
+            try:
+                os.remove(file_path)
+            except OSError as e:
+                print(f"Error: {file_path} : {e.strerror}")
+
 
 if __name__ == "__main__":
-
+    print("Python version:", sys.version)
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_type", dest="output_type", help="'unique': Zip archive to store the unique images "
                                                                     "or `all': Zip archive that includes a folder for "
@@ -131,15 +141,12 @@ if __name__ == "__main__":
                         # and all duplicates are in a subfolder called duplicates. if output is `unique` then just
                         # store in the image in the output folder
                         if args.output_type.lower() == 'all':
+
                             with zipfile.ZipFile(ZIP_IMAGE_OUTPUT, 'w', zipfile.ZIP_DEFLATED) as zip_output_unique_ref:
                                 # root of the matching files is the first encountered filename, and duplicates are
                                 # saved in a subfolder called duplicates
                                 temp_image_file = os.path.join(TMP_WRK, name)
                                 zip_ref.extract(name, temp_image_file)
-
-                                # create the unique image folder
-                                dir_unique_info = zipfile.ZipInfo(os.path.join(name, "/"))
-                                zip_output_unique_ref.writestr(dir_unique_info, '')
 
                                 # write the unique file to the folder from the tmp
                                 zip_output_unique_ref.write(temp_image_file, os.path.join(name, "/", name))
@@ -148,7 +155,7 @@ if __name__ == "__main__":
     logging.info("Total duplicates found: %s", len(image_matching_hash_pd))
 
     # cleanup temp dir
-    os.rmdir(TMP_WRK)
+    removeFilesFromDir(TMP_WRK)
 
     if len(image_matching_hash_pd) > 0:
         image_matching_hash_pd.to_csv(MATCH_IMAGE_FULL_PATH, index=False, header=True, encoding='utf-8', sep=',')
