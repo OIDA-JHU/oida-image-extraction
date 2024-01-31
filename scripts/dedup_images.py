@@ -59,7 +59,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     unique_image_hash_pd = pd.DataFrame(columns=['image_file_name', 'hash'])
-    image_matching_hash_pd = pd.DataFrame(columns=['match_image_file_name', 'match_hash', 'match_with_image_file_name',
+    image_matching_hash_pd = pd.DataFrame(columns=['dup_image_file_name', 'match_hash', 'unique_with_image_file_name',
                                                    "match_with_original_hash"])
 
     DEFAULT_CONFIG_PATH = os.path.join('..\config', 'dedup_config.yaml')
@@ -115,7 +115,7 @@ if __name__ == "__main__":
                                                 matched_hashes_pd.iloc[0]['image_file_name'],
                                                 matched_hashes_pd.iloc[0]['hash']],
                                                index=image_matching_hash_pd.columns)
-
+                        logging.info("Duplicate found: %s", name)
                         # hashes matched, put into image_matching_hash_pd
                         image_matching_hash_pd = pd.concat([image_matching_hash_pd, pd.DataFrame([new_record])],
                                                           ignore_index=True)
@@ -127,7 +127,7 @@ if __name__ == "__main__":
                                 # root of the matching files is the first encountered filename, and duplicates are
                                 # saved in a subfolder called duplicates
                                 zip_ref.extract(name, os.path.join(TMP_WRK))
-                                logging.info("unique file name = %s", matched_hashes_pd.iloc[0]['image_file_name'])
+                                logging.info("Storing duplicate file %s that matched with unique file %s", name, matched_hashes_pd.iloc[0]['image_file_name'])
                                 duplicate_file_path = os.path.join(matched_hashes_pd.iloc[0]['image_file_name'],
                                                                    "duplicates",
                                                                    name)
@@ -149,6 +149,7 @@ if __name__ == "__main__":
                                 # saved in a subfolder called duplicates
                                 zip_ref.extract(name, os.path.join(TMP_WRK))
                                 zip_output_unique_ref.write(os.path.join(TMP_WRK, name), arcname=name)
+                                logging.info("unique file name = %s, added to unique file output", name)
 
     logging.info("Total unique images: %s", len(unique_image_hash_pd))
     logging.info("Total duplicates found: %s", len(image_matching_hash_pd))
