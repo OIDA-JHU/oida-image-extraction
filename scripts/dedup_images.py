@@ -23,7 +23,7 @@ def init_file_structure(file_path_config):
     os.makedirs(file_path_config['data_output']['image_output_dir'], exist_ok=True)
     os.makedirs(file_path_config['data_output']['dedup_log_file_dir'], exist_ok=True)
 
-def removeFilesFromDir(dir_path):
+def remove_files_from_dir(dir_path):
     for file_name in os.listdir(dir_path):
         file_path = os.path.join(dir_path, file_name)
         if os.path.isfile(file_path) or os.path.islink(file_path):
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     logging.info("Total duplicates found: %s", len(image_matching_hash_pd))
 
     # cleanup temp dir
-    removeFilesFromDir(TMP_WRK)
+    remove_files_from_dir(TMP_WRK)
 
     if len(image_matching_hash_pd) > 0:
         image_matching_hash_pd.to_csv(MATCH_IMAGE_FULL_PATH, index=False, header=True, encoding='utf-8', sep=',')
