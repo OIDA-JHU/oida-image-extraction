@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import re
 import sys
 import tempfile
 
@@ -96,7 +97,9 @@ if __name__ == "__main__":
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             # Iterate over each item
             for entry in zip_ref.infolist():
+                pattern = r"^.*?(?=[a-z]{4}[0-9]{4}\.zip)"
                 name = entry.filename
+                clean_name = re.sub(pattern, '', name)
 
                 # Check if it is a directory, if not then process.
                 if not name.endswith('/'):
@@ -131,7 +134,7 @@ if __name__ == "__main__":
                                 duplicate_file_path = os.path.join(matched_hashes_pd.iloc[0]['image_file_name'],
                                                                    "duplicates",
                                                                    name)
-                                zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=name)
+                                zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
 
                     else:
                         new_record = pd.Series([name,
@@ -148,7 +151,7 @@ if __name__ == "__main__":
                                 # root of the matching files is the first encountered filename, and duplicates are
                                 # saved in a subfolder called duplicates
                                 zip_ref.extract(name, os.path.join(TMP_WRK))
-                                zip_output_unique_ref.write(os.path.join(TMP_WRK, name), arcname=name)
+                                zip_output_unique_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
                                 logging.info("unique file name = %s, added to unique file output", name)
 
     logging.info("Total unique images: %s", len(unique_image_hash_pd))
@@ -156,6 +159,7 @@ if __name__ == "__main__":
 
     # cleanup temp dir
     remove_files_from_dir(TMP_WRK)
+    os.rmdir(TMP_WRK)
 
     if len(image_matching_hash_pd) > 0:
         image_matching_hash_pd.to_csv(MATCH_IMAGE_FULL_PATH, index=False, header=True, encoding='utf-8', sep=',')
