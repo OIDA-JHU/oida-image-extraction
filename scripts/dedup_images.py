@@ -74,8 +74,11 @@ if __name__ == "__main__":
     LOG_FILE = os.path.join(config['data_output']['dedup_log_file_dir'],
                             config['data_output']['dedup_log_file_name'])
 
-    ZIP_IMAGE_OUTPUT = os.path.join(config['data_output']['image_output_dir'],
-                                    config['data_output']['image_output_filename'])
+    ZIP_UNIQUE_IMAGE_OUTPUT = os.path.join(config['data_output']['image_output_dir'],
+                                           config['data_output']['unique_image_output_filename'])
+
+    ZIP_DUPLICATE_IMAGE_OUTPUT = os.path.join(config['data_output']['image_output_dir'],
+                                           config['data_output']['duplicate_image_output_filename'])
 
     TMP_WRK = os.path.join(config['data_output']['tmp_working_dir'])
 
@@ -120,16 +123,15 @@ if __name__ == "__main__":
                         # Only store file if out_type == 'all' because by definition, if an image matched then it's not
                         # unique
                         if args.output_type.lower() == 'all':
-                            with zipfile.ZipFile(ZIP_IMAGE_OUTPUT, 'w', zipfile.ZIP_DEFLATED) as zip_output_match_ref:
+                            with zipfile.ZipFile(ZIP_DUPLICATE_IMAGE_OUTPUT, 'a') as zip_output_match_ref:
                                 # root of the matching files is the first encountered filename, and duplicates are
                                 # saved in a subfolder called duplicates
-                                temp_image_file = os.path.join(TMP_WRK, name)
-                                zip_ref.extract(name, temp_image_file)
+                                zip_ref.extract(name, os.path.join(TMP_WRK))
                                 logging.info("unique file name = %s", matched_hashes_pd.iloc[0]['image_file_name'])
                                 duplicate_file_path = os.path.join(matched_hashes_pd.iloc[0]['image_file_name'],
                                                                    "duplicates",
                                                                    name)
-                                zip_output_match_ref.write(temp_image_file, duplicate_file_path)
+                                zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=name)
 
                     else:
                         new_record = pd.Series([name,
@@ -142,14 +144,11 @@ if __name__ == "__main__":
                         # store in the image in the output folder
                         if args.output_type.lower() == 'all':
 
-                            with zipfile.ZipFile(ZIP_IMAGE_OUTPUT, 'w', zipfile.ZIP_DEFLATED) as zip_output_unique_ref:
+                            with zipfile.ZipFile(ZIP_UNIQUE_IMAGE_OUTPUT, 'a') as zip_output_unique_ref:
                                 # root of the matching files is the first encountered filename, and duplicates are
                                 # saved in a subfolder called duplicates
-                                temp_image_file = os.path.join(TMP_WRK, name)
-                                zip_ref.extract(name, temp_image_file)
-
-                                # write the unique file to the folder from the tmp
-                                zip_output_unique_ref.write(temp_image_file, os.path.join(name, "/", name))
+                                zip_ref.extract(name, os.path.join(TMP_WRK))
+                                zip_output_unique_ref.write(os.path.join(TMP_WRK, name), arcname=name)
 
     logging.info("Total unique images: %s", len(unique_image_hash_pd))
     logging.info("Total duplicates found: %s", len(image_matching_hash_pd))
