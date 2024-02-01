@@ -64,11 +64,16 @@ if __name__ == "__main__":
                              "specified, the input will be treated as the entire image corpus.")
     parser.add_argument("--image_similarity", dest="image_threshold", help="Deduplicate on similarity and use this "
                                                                            "argument as the threshold.")
-    parser.add_argument("--matching_images_file", dest="match_images_file", help=
-                                                                "If this parameter is supplied, it will take the list "
-                                                                "of matching file IDs and output them to the path."
-                                                                "This will override the setting in the "
-                                                                "dedup_config.yaml")
+    parser.add_argument("--separate_similar_images",
+                        dest="separate_similar",
+                        default="y",
+                        choices=["Y", "N", "y", "n"],
+                        help="Store similarly matched images separate from exact matches.")
+    parser.add_argument("--matching_images_file", dest="match_images_file", help="If this parameter is supplied, it "
+                                                                                 "will take the list of matching file "
+                                                                                 "IDs and output them to the path. "
+                                                                                 "This  will override the setting in "
+                                                                                 "the dedup_config.yaml")
     parser.add_argument("--image_ext", dest="image_ext")
     args = parser.parse_args()
 
@@ -130,22 +135,26 @@ if __name__ == "__main__":
                     logging.info("Hash for image '%s': '%s'", name, image_hash)
 
                     matched_hashes_pd = pd.DataFrame()
-                    if len(unique_image_hash_pd) > 0:
-                        if SIMILAR_THRESHOLD == 0 and len(unique_image_hash_pd) > 0:
+
+                    try:
+                        if SIMILAR_THRESHOLD == 0:
                             matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'] == image_hash]
                         else:
                             matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'].apply(
                                 lambda x: distance.hamming(list(str(x)), list(image_hash))) < SIMILAR_THRESHOLD]
+                    except Exception as ex:
+                        logging.info("Error trying to find duplicate in the unique dataset: %s", str(ex))
+                        error_cnt = error_cnt + 1
 
                     # if there is a matching hash then put in the image_matching_hash_pd
                     # otherwise not match exists then put in image_hash_pd
                     if not matched_hashes_pd.empty:
+                        ham_distance = distance.hamming(list(str(matched_hashes_pd.iloc[0]['hash'])),list(image_hash))
                         new_record = pd.Series([name,
                                                 image_hash,
                                                 matched_hashes_pd.iloc[0]['image_file_name'],
                                                 matched_hashes_pd.iloc[0]['hash'],
-                                                distance.hamming(list(str(matched_hashes_pd.iloc[0]['hash'])),
-                                                                 list(image_hash))],
+                                                ham_distance],
                                                index=image_matching_hash_pd.columns)
                         logging.info("Duplicate found: %s", name)
                         # hashes matched, put into image_matching_hash_pd
@@ -165,7 +174,17 @@ if __name__ == "__main__":
                                     duplicate_file_path = os.path.join(matched_hashes_pd.iloc[0]['image_file_name'],
                                                                        "duplicates",
                                                                        name)
-                                    zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
+                                    if args.separate_similar.lower() == 'y':
+                                        if ham_distance != 0:
+                                            zip_output_match_ref.write(os.path.join(TMP_WRK, name),
+                                                                       arcname=os.path.join("/similar_match/",
+                                                                                            clean_name))
+                                        else:
+                                            zip_output_match_ref.write(os.path.join(TMP_WRK, name),
+                                                                       arcname=os.path.join("/exact_match/",
+                                                                                            clean_name))
+                                    else:
+                                        zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
                             except Exception as ex:
                                 logging.info("Unable to open %s during processing of %s, error: ",
                                              ZIP_DUPLICATE_IMAGE_OUTPUT, str(ex))
