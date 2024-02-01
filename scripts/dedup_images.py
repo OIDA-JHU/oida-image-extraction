@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import sys
+import time
 
 import yaml
 import zipfile
@@ -39,7 +40,14 @@ def hamming_distance(hash1, hash2):
     return bin(hash1 ^ hash2).count('1')
 
 
+def format_duration(seconds):
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{int(hours)}h {int(minutes)}m {seconds:.2f}s"
+
+
 if __name__ == "__main__":
+    start_time = time.time()
     print("Python version:", sys.version)
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_type", dest="output_type", help="'unique': Zip archive to store the unique images "
@@ -77,6 +85,9 @@ if __name__ == "__main__":
     else:
         MATCH_IMAGE_FULL_PATH = os.path.join(config['data_output']['matching_images_csv_dir'],
                                              config['data_output']['matching_images_csv_filename'])
+    SIMILAR_THRESHOLD = 0
+    if args.image_threshold:
+        SIMILAR_THRESHOLD = args.image_threshold
 
     LOG_FILE = os.path.join(config['data_output']['dedup_log_file_dir'],
                             config['data_output']['dedup_log_file_name'])
@@ -180,4 +191,6 @@ if __name__ == "__main__":
 
     if len(image_matching_hash_pd) > 0:
         image_matching_hash_pd.to_csv(MATCH_IMAGE_FULL_PATH, index=False, header=True, encoding='utf-8', sep=',')
+
+    logging.info("Image extraction run time: " + format_duration(time.time() - start_time))
 
