@@ -3,14 +3,13 @@ import logging
 import os
 import re
 import sys
-import tempfile
-import time
 
 import yaml
 import zipfile
 import pandas as pd
 from PIL import Image
 import imagehash
+
 
 def load_config(config_path):
     with open(config_path, 'r') as file:
@@ -25,6 +24,7 @@ def init_file_structure(file_path_config):
     os.makedirs(file_path_config['data_output']['image_output_dir'], exist_ok=True)
     os.makedirs(file_path_config['data_output']['dedup_log_file_dir'], exist_ok=True)
 
+
 def remove_files_from_dir(dir_path):
     for file_name in os.listdir(dir_path):
         file_path = os.path.join(dir_path, file_name)
@@ -33,6 +33,10 @@ def remove_files_from_dir(dir_path):
                 os.remove(file_path)
             except OSError as e:
                 print(f"Error: {file_path} : {e.strerror}")
+
+
+def hamming_distance(hash1, hash2):
+    return bin(hash1 ^ hash2).count('1')
 
 
 if __name__ == "__main__":
@@ -81,7 +85,7 @@ if __name__ == "__main__":
                                            config['data_output']['unique_image_output_filename'])
 
     ZIP_DUPLICATE_IMAGE_OUTPUT = os.path.join(config['data_output']['image_output_dir'],
-                                           config['data_output']['duplicate_image_output_filename'])
+                                              config['data_output']['duplicate_image_output_filename'])
 
     TMP_WRK = os.path.join(config['data_output']['tmp_working_dir'])
 
