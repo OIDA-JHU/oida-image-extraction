@@ -86,9 +86,9 @@ if __name__ == "__main__":
     else:
         MATCH_IMAGE_FULL_PATH = os.path.join(config['data_output']['matching_images_csv_dir'],
                                              config['data_output']['matching_images_csv_filename'])
-    SIMILAR_THRESHOLD = 0
+    SIMILAR_THRESHOLD = float(0.0)
     if args.image_threshold:
-        SIMILAR_THRESHOLD = args.image_threshold
+        SIMILAR_THRESHOLD = float(args.image_threshold)
 
     LOG_FILE = os.path.join(config['data_output']['dedup_log_file_dir'],
                             config['data_output']['dedup_log_file_name'])
@@ -129,11 +129,13 @@ if __name__ == "__main__":
                     image_hash = str(imagehash.phash(image))
                     logging.info("Hash for image '%s': '%s'", name, image_hash)
 
-                    if SIMILAR_THRESHOLD == 0:
-                        matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'] == image_hash]
-                    else:
-                        matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'].apply(
-                            lambda x: distance.hamming(x, image_hash)) < SIMILAR_THRESHOLD]
+                    matched_hashes_pd = pd.DataFrame()
+                    if len(unique_image_hash_pd) > 0:
+                        if SIMILAR_THRESHOLD == 0 and len(unique_image_hash_pd) > 0:
+                            matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'] == image_hash]
+                        else:
+                            matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'].apply(
+                                lambda x: distance.hamming(list(str(x)), list(image_hash))) < SIMILAR_THRESHOLD]
 
                     # if there is a matching hash then put in the image_matching_hash_pd
                     # otherwise not match exists then put in image_hash_pd
@@ -142,7 +144,8 @@ if __name__ == "__main__":
                                                 image_hash,
                                                 matched_hashes_pd.iloc[0]['image_file_name'],
                                                 matched_hashes_pd.iloc[0]['hash'],
-                                                hamming_distance(matched_hashes_pd.iloc[0]['hash'], image_hash)],
+                                                distance.hamming(list(str(matched_hashes_pd.iloc[0]['hash'])),
+                                                                 list(image_hash))],
                                                index=image_matching_hash_pd.columns)
                         logging.info("Duplicate found: %s", name)
                         # hashes matched, put into image_matching_hash_pd
@@ -165,7 +168,7 @@ if __name__ == "__main__":
                                     zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
                             except Exception as ex:
                                 logging.info("Unable to open %s during processing of %s, error: ",
-                                             ZIP_DUPLICATE_IMAGE_OUTPUT, ex)
+                                             ZIP_DUPLICATE_IMAGE_OUTPUT, str(ex))
                                 error_cnt = error_cnt + 1
 
                     else:
@@ -186,7 +189,8 @@ if __name__ == "__main__":
                                     zip_output_unique_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
                                     logging.info("unique file name = %s, added to unique file output", name)
                             except Exception as ex:
-                                logging.info("Unable to open %s during processing of %s, error", ZIP_UNIQUE_IMAGE_OUTPUT, name, ex)
+                                logging.info("Unable to open %s during processing of %s, error",
+                                             ZIP_UNIQUE_IMAGE_OUTPUT, name, str(ex))
                                 error_cnt = error_cnt + 1
 
     logging.info("Total unique images: %s", len(unique_image_hash_pd))
