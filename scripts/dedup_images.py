@@ -10,6 +10,7 @@ import zipfile
 import pandas as pd
 from PIL import Image
 import imagehash
+from scipy.spatial import distance
 
 
 def load_config(config_path):
@@ -75,7 +76,7 @@ if __name__ == "__main__":
 
     unique_image_hash_pd = pd.DataFrame(columns=['image_file_name', 'hash'])
     image_matching_hash_pd = pd.DataFrame(columns=['dup_image_file_name', 'match_hash', 'unique_with_image_file_name',
-                                                   "match_with_original_hash"])
+                                                   "match_with_original_hash", "similarity"])
 
     DEFAULT_CONFIG_PATH = os.path.join('..\config', 'dedup_config.yaml')
     config = load_config(DEFAULT_CONFIG_PATH)
@@ -125,10 +126,14 @@ if __name__ == "__main__":
                 if not name.endswith('/'):
                     logging.info("Processing image: '%s'", name)
                     image = Image.open(zip_ref.open(entry))
-                    image_hash = imagehash.phash(image)
+                    image_hash = str(imagehash.phash(image))
                     logging.info("Hash for image '%s': '%s'", name, image_hash)
 
-                    matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'] == image_hash]
+                    if SIMILAR_THRESHOLD == 0:
+                        matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'] == image_hash]
+                    else:
+                        matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'].apply(
+                            lambda x: distance.hamming(x, image_hash)) < SIMILAR_THRESHOLD]
 
                     # if there is a matching hash then put in the image_matching_hash_pd
                     # otherwise not match exists then put in image_hash_pd
@@ -136,7 +141,8 @@ if __name__ == "__main__":
                         new_record = pd.Series([name,
                                                 image_hash,
                                                 matched_hashes_pd.iloc[0]['image_file_name'],
-                                                matched_hashes_pd.iloc[0]['hash']],
+                                                matched_hashes_pd.iloc[0]['hash'],
+                                                hamming_distance(matched_hashes_pd.iloc[0]['hash'], image_hash)],
                                                index=image_matching_hash_pd.columns)
                         logging.info("Duplicate found: %s", name)
                         # hashes matched, put into image_matching_hash_pd
@@ -151,13 +157,15 @@ if __name__ == "__main__":
                                 with zipfile.ZipFile(ZIP_DUPLICATE_IMAGE_OUTPUT, 'a') as zip_output_match_ref:
                                     # root of the matching files is the first encountered filename, and duplicates are
                                     # saved in a subfolder called duplicates
-                                    logging.info("Storing duplicate file %s that matched with unique file %s", name, matched_hashes_pd.iloc[0]['image_file_name'])
+                                    logging.info("Storing duplicate file %s that matched with unique file %s", name,
+                                                 matched_hashes_pd.iloc[0]['image_file_name'])
                                     duplicate_file_path = os.path.join(matched_hashes_pd.iloc[0]['image_file_name'],
                                                                        "duplicates",
                                                                        name)
                                     zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
                             except Exception as ex:
-                                logging.info("Unable to open %s during processing of %s, error: ", ZIP_DUPLICATE_IMAGE_OUTPUT, ex)
+                                logging.info("Unable to open %s during processing of %s, error: ",
+                                             ZIP_DUPLICATE_IMAGE_OUTPUT, ex)
                                 error_cnt = error_cnt + 1
 
                     else:
