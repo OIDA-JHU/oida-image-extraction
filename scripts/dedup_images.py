@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 
 import yaml
 import zipfile
@@ -48,7 +49,8 @@ if __name__ == "__main__":
                         help="The entire set of images to deduplicate. This is in contrast to the input, where you may "
                              "only want to process a subset of images, but against the whole corpus of images. If not "
                              "specified, the input will be treated as the entire image corpus.")
-    parser.add_argument("--image_similarity", dest="image_threshold", help="Zip archives of images to deduplicate")
+    parser.add_argument("--image_similarity", dest="image_threshold", help="Deduplicate on similarity and use this "
+                                                                           "argument as the threshold.")
     parser.add_argument("--matching_images_file", dest="match_images_file", help=
                                                                 "If this parameter is supplied, it will take the list "
                                                                 "of matching file IDs and output them to the path."
@@ -82,6 +84,9 @@ if __name__ == "__main__":
                                            config['data_output']['duplicate_image_output_filename'])
 
     TMP_WRK = os.path.join(config['data_output']['tmp_working_dir'])
+
+    # count all errors
+    error_cnt = 0
 
     # init file structure
     init_file_structure(config)
@@ -126,15 +131,19 @@ if __name__ == "__main__":
                         # Only store file if out_type == 'all' because by definition, if an image matched then it's not
                         # unique
                         if args.output_type.lower() == 'all':
-                            with zipfile.ZipFile(ZIP_DUPLICATE_IMAGE_OUTPUT, 'a') as zip_output_match_ref:
-                                # root of the matching files is the first encountered filename, and duplicates are
-                                # saved in a subfolder called duplicates
-                                zip_ref.extract(name, os.path.join(TMP_WRK))
-                                logging.info("Storing duplicate file %s that matched with unique file %s", name, matched_hashes_pd.iloc[0]['image_file_name'])
-                                duplicate_file_path = os.path.join(matched_hashes_pd.iloc[0]['image_file_name'],
-                                                                   "duplicates",
-                                                                   name)
-                                zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
+                            zip_ref.extract(name, os.path.join(TMP_WRK))
+                            try:
+                                with zipfile.ZipFile(ZIP_DUPLICATE_IMAGE_OUTPUT, 'a') as zip_output_match_ref:
+                                    # root of the matching files is the first encountered filename, and duplicates are
+                                    # saved in a subfolder called duplicates
+                                    logging.info("Storing duplicate file %s that matched with unique file %s", name, matched_hashes_pd.iloc[0]['image_file_name'])
+                                    duplicate_file_path = os.path.join(matched_hashes_pd.iloc[0]['image_file_name'],
+                                                                       "duplicates",
+                                                                       name)
+                                    zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
+                            except Exception as ex:
+                                logging.info("Unable to open %s during processing of %s, error: ", ZIP_DUPLICATE_IMAGE_OUTPUT, ex)
+                                error_cnt = error_cnt + 1
 
                     else:
                         new_record = pd.Series([name,
@@ -145,17 +154,21 @@ if __name__ == "__main__":
                         # if output is `all` then store the original in a folder of original image file name
                         # and all duplicates are in a subfolder called duplicates. if output is `unique` then just
                         # store in the image in the output folder
-                        if args.output_type.lower() == 'all':
-
-                            with zipfile.ZipFile(ZIP_UNIQUE_IMAGE_OUTPUT, 'a') as zip_output_unique_ref:
-                                # root of the matching files is the first encountered filename, and duplicates are
-                                # saved in a subfolder called duplicates
-                                zip_ref.extract(name, os.path.join(TMP_WRK))
-                                zip_output_unique_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
-                                logging.info("unique file name = %s, added to unique file output", name)
+                        if args.output_type.lower() == 'all' or args.output_type.lower() == 'unique':
+                            zip_ref.extract(name, os.path.join(TMP_WRK))
+                            try:
+                                with zipfile.ZipFile(ZIP_UNIQUE_IMAGE_OUTPUT, 'a') as zip_output_unique_ref:
+                                    # root of the matching files is the first encountered filename, and duplicates are
+                                    # saved in a subfolder called duplicates
+                                    zip_output_unique_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
+                                    logging.info("unique file name = %s, added to unique file output", name)
+                            except Exception as ex:
+                                logging.info("Unable to open %s during processing of %s, error", ZIP_UNIQUE_IMAGE_OUTPUT, name, ex)
+                                error_cnt = error_cnt + 1
 
     logging.info("Total unique images: %s", len(unique_image_hash_pd))
     logging.info("Total duplicates found: %s", len(image_matching_hash_pd))
+    logging.info("Total errors: %s", error_cnt)
 
     # cleanup temp dir
     remove_files_from_dir(TMP_WRK)
