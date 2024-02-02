@@ -47,6 +47,11 @@ def format_duration(seconds):
     return f"{int(hours)}h {int(minutes)}m {seconds:.2f}s"
 
 
+def output_unique_with_similar(matching_pd):
+    # TODO: implement
+    return matching_pd
+
+
 if __name__ == "__main__":
     start_time = time.time()
     print("Python version:", sys.version)
@@ -73,6 +78,12 @@ if __name__ == "__main__":
                         default="y",
                         choices=["Y", "N", "y", "n"],
                         help="Store similarly matched images separate from exact matches.")
+    parser.add_argument("--group_similar_with_unique",
+                        dest="separate_similar",
+                        default="y",
+                        choices=["Y", "N", "y", "n"],
+                        help="In a separate output, put all the unique photos in a folder with all the similarly "
+                             "matched images.")
     parser.add_argument("--matching_images_file", dest="match_images_file", help="If this parameter is supplied, it "
                                                                                  "will take the list of matching file "
                                                                                  "IDs and output them to the path. "
@@ -219,6 +230,9 @@ if __name__ == "__main__":
     logging.info("Total unique images: %s", len(unique_image_hash_pd))
     logging.info("Total duplicates found: %s", len(image_matching_hash_pd))
     logging.info("Total errors: %s", error_cnt)
+
+    # TODO: output the unique image with all images that are similar
+    output_unique_with_similar(image_matching_hash_pd)
 
     # cleanup temp dir
     remove_files_from_dir(TMP_WRK)
