@@ -58,10 +58,14 @@ if __name__ == "__main__":
                                                                     "of images", required=True)
     parser.add_argument("--inputs", dest="inputs", nargs="+", help="Zip archives of images to deduplicate",
                         required=True)
+
+    # TODO: Need ability to do partial data deduping. New data to be compared against what already has been processed.
+    '''
     parser.add_argument("--total_image_corpus", dest="image_corpus",
                         help="The entire set of images to deduplicate. This is in contrast to the input, where you may "
                              "only want to process a subset of images, but against the whole corpus of images. If not "
                              "specified, the input will be treated as the entire image corpus.")
+    '''
     parser.add_argument("--image_similarity", dest="image_threshold", help="Deduplicate on similarity and use this "
                                                                            "argument as the threshold.")
     parser.add_argument("--separate_similar_images",
