@@ -47,9 +47,31 @@ def format_duration(seconds):
     return f"{int(hours)}h {int(minutes)}m {seconds:.2f}s"
 
 
-def output_unique_with_similar(matching_pd):
-    # TODO: implement
-    return matching_pd
+def clean_file_name(fn):
+    pattern = r"^.*?(?=[a-z]{4}[0-9]{4}\.zip)"
+    return re.sub(pattern, '', fn)
+
+
+def output_unique_with_similar(matching_pd, output_dir):
+    full_output_dir = os.path.join(output_dir, 'group_similar_output.zip')
+    # Get all the unique keys in the column
+    unique_image_df = matching_pd[matching_pd['similarity'] > 0]
+    unique_image_df = unique_image_df.drop_duplicates(subset=['unique_with_image_file_name'])
+
+    # Write all the duplicates to the unique folder in a duplicates sub-folder
+    for uf in unique_image_df.itertuples():
+        dup_image_df = image_matching_hash_pd[
+            image_matching_hash_pd['unique_with_image_file_name'] == clean_file_name(uf.unique_with_image_file_name)]
+        with zipfile.ZipFile(full_output_dir, 'a') as zip_unique_similar:
+            # write the unique dir and file
+            zip_unique_similar.write(os.path.join(TMP_WRK, clean_file_name(uf.unique_with_image_file_name)),
+                                     arcname=os.path.join(clean_file_name(uf.unique_with_image_file_name),
+                                                          clean_file_name(uf.unique_with_image_file_name)))
+            # write the duplicates and duplicate files
+            for dupf in dup_image_df.itertuples():
+                zip_unique_similar.write(os.path.join(TMP_WRK, name),
+                                           arcname=os.path.join(clean_file_name(uf.unique_with_image_file_name),
+                                                                clean_file_name(dupf.dup_image_file_name)))
 
 
 if __name__ == "__main__":
@@ -119,6 +141,8 @@ if __name__ == "__main__":
     ZIP_DUPLICATE_IMAGE_OUTPUT = os.path.join(config['data_output']['image_output_dir'],
                                               config['data_output']['duplicate_image_output_filename'])
 
+    IMAGE_OUTPUT_DIR = os.path.join(config['data_output']['image_output_dir'])
+
     TMP_WRK = os.path.join(config['data_output']['tmp_working_dir'])
 
     # count all errors
@@ -138,9 +162,8 @@ if __name__ == "__main__":
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             # Iterate over each item
             for entry in zip_ref.infolist():
-                pattern = r"^.*?(?=[a-z]{4}[0-9]{4}\.zip)"
                 name = entry.filename
-                clean_name = re.sub(pattern, '', name)
+                clean_name = clean_file_name(name)
 
                 # Check if it is a directory, if not then process.
                 if not name.endswith('/'):
@@ -232,7 +255,7 @@ if __name__ == "__main__":
     logging.info("Total errors: %s", error_cnt)
 
     # TODO: output the unique image with all images that are similar
-    output_unique_with_similar(image_matching_hash_pd)
+    output_unique_with_similar(image_matching_hash_pd, IMAGE_OUTPUT_DIR)
 
     # cleanup temp dir
     remove_files_from_dir(TMP_WRK)
