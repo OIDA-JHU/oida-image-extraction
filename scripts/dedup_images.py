@@ -60,17 +60,18 @@ def output_unique_with_similar(matching_pd, output_dir):
 
     # Write all the duplicates to the unique folder in a duplicates sub-folder
     for uf in unique_image_df.itertuples():
-        dup_image_df = image_matching_hash_pd[
-            image_matching_hash_pd['unique_with_image_file_name'] == clean_file_name(uf.unique_with_image_file_name)]
         with zipfile.ZipFile(full_output_dir, 'a') as zip_unique_similar:
+            dup_image_df = matching_pd[
+                (matching_pd['unique_with_image_file_name'] == uf.unique_with_image_file_name) & (matching_pd['similarity'] > 0)]
             # write the unique dir and file
             zip_unique_similar.write(os.path.join(TMP_WRK, clean_file_name(uf.unique_with_image_file_name)),
                                      arcname=os.path.join(clean_file_name(uf.unique_with_image_file_name),
                                                           clean_file_name(uf.unique_with_image_file_name)))
             # write the duplicates and duplicate files
             for dupf in dup_image_df.itertuples():
-                zip_unique_similar.write(os.path.join(TMP_WRK, name),
+                zip_unique_similar.write(os.path.join(TMP_WRK, clean_file_name(dupf.dup_image_file_name)),
                                            arcname=os.path.join(clean_file_name(uf.unique_with_image_file_name),
+                                                                "duplicates",
                                                                 clean_file_name(dupf.dup_image_file_name)))
 
 
@@ -79,10 +80,10 @@ if __name__ == "__main__":
     print("Python version:", sys.version)
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_type", dest="output_type", help="'unique': Zip archive to store the unique images "
-                                                                    "or `all': Zip archive that includes a folder for "
-                                                                    "each unique image, and a subfolder containing all "
-                                                                    "duplicates. This is useful when using similarity "
-                                                                    "of images", required=True)
+                                                                  "or `all': Zip archive that includes a folder for "
+                                                                  "each unique image, and a subfolder containing all "
+                                                                  "duplicates. This is useful when using similarity "
+                                                                  "of images", required=True)
     parser.add_argument("--inputs", dest="inputs", nargs="+", help="Zip archives of images to deduplicate",
                         required=True)
 
@@ -203,6 +204,7 @@ if __name__ == "__main__":
                         # unique
                         if args.output_type.lower() == 'all':
                             zip_ref.extract(name, os.path.join(TMP_WRK))
+                            os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, clean_name)))
                             try:
                                 with zipfile.ZipFile(ZIP_DUPLICATE_IMAGE_OUTPUT, 'a') as zip_output_match_ref:
                                     # root of the matching files is the first encountered filename, and duplicates are
@@ -214,15 +216,15 @@ if __name__ == "__main__":
                                                                        name)
                                     if args.separate_similar.lower() == 'y':
                                         if ham_distance != 0:
-                                            zip_output_match_ref.write(os.path.join(TMP_WRK, name),
+                                            zip_output_match_ref.write(os.path.join(TMP_WRK, clean_name),
                                                                        arcname=os.path.join("/similar_match/",
                                                                                             clean_name))
                                         else:
-                                            zip_output_match_ref.write(os.path.join(TMP_WRK, name),
+                                            zip_output_match_ref.write(os.path.join(TMP_WRK, clean_name),
                                                                        arcname=os.path.join("/exact_match/",
                                                                                             clean_name))
                                     else:
-                                        zip_output_match_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
+                                        zip_output_match_ref.write(os.path.join(TMP_WRK, clean_name), arcname=clean_name)
                             except Exception as ex:
                                 logging.info("Unable to open %s during processing of %s, error: ",
                                              ZIP_DUPLICATE_IMAGE_OUTPUT, str(ex))
@@ -239,14 +241,15 @@ if __name__ == "__main__":
                         # store in the image in the output folder
                         if args.output_type.lower() == 'all' or args.output_type.lower() == 'unique':
                             zip_ref.extract(name, os.path.join(TMP_WRK))
+                            os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, clean_name)))
                             try:
                                 with zipfile.ZipFile(ZIP_UNIQUE_IMAGE_OUTPUT, 'a') as zip_output_unique_ref:
                                     # root of the matching files is the first encountered filename, and duplicates are
                                     # saved in a subfolder called duplicates
-                                    zip_output_unique_ref.write(os.path.join(TMP_WRK, name), arcname=clean_name)
+                                    zip_output_unique_ref.write(os.path.join(TMP_WRK, clean_name), arcname=clean_name)
                                     logging.info("unique file name = %s, added to unique file output", name)
                             except Exception as ex:
-                                logging.info("Unable to open %s during processing of %s, error",
+                                logging.info("Unable to open %s during processing of %s, error: %s",
                                              ZIP_UNIQUE_IMAGE_OUTPUT, name, str(ex))
                                 error_cnt = error_cnt + 1
 
