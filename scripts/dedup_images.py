@@ -113,6 +113,8 @@ if __name__ == "__main__":
                                                                                  "This  will override the setting in "
                                                                                  "the dedup_config.yaml")
     parser.add_argument("--image_ext", dest="image_ext")
+    parser.add_argument("--config_file", dest="config_file_loc", help="Override the default location of the config "
+                                                                      "file. Include the file name in the path.")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -120,9 +122,13 @@ if __name__ == "__main__":
     unique_image_hash_pd = pd.DataFrame(columns=['image_file_name', 'hash'])
     image_matching_hash_pd = pd.DataFrame(columns=['dup_image_file_name', 'match_hash', 'unique_with_image_file_name',
                                                    "match_with_original_hash", "similarity"])
-
-    DEFAULT_CONFIG_PATH = os.path.join('..', 'config', 'dedup_config.yaml')
+    DEFAULT_CONFIG_PATH = ""
+    if args.config_file_loc:
+        DEFAULT_CONFIG_PATH = args.config_file_loc
+    else:
+        DEFAULT_CONFIG_PATH = os.path.join('..', 'config', 'dedup_config.yaml')
     config = load_config(DEFAULT_CONFIG_PATH)
+
     MATCH_IMAGE_FULL_PATH = ''
     if args.match_images_file:
         MATCH_IMAGE_FULL_PATH = args.match_images_file
