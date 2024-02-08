@@ -4,6 +4,8 @@ import os
 import re
 import sys
 import time
+import uuid
+from pathlib import Path
 
 import yaml
 import zipfile
@@ -64,15 +66,16 @@ def output_unique_with_similar(matching_pd, output_dir):
             dup_image_df = matching_pd[
                 (matching_pd['unique_with_image_file_name'] == uf.unique_with_image_file_name) & (matching_pd['similarity'] > 0)]
             # write the unique dir and file
-            zip_unique_similar.write(os.path.join(TMP_WRK, clean_file_name(uf.unique_with_image_file_name)),
-                                     arcname=os.path.join(clean_file_name(uf.unique_with_image_file_name),
-                                                          clean_file_name(uf.unique_with_image_file_name)))
+            ext = Path(uf.unique_with_image_file_name).suffix
+            zip_unique_similar.write(os.path.join(TMP_WRK, uf.unique_with_image_image_id+ext),
+                                     arcname=os.path.join(uf.unique_with_image_image_id,
+                                                          uf.unique_with_image_image_id+ext))
             # write the duplicates and duplicate files
             for dupf in dup_image_df.itertuples():
-                zip_unique_similar.write(os.path.join(TMP_WRK, clean_file_name(dupf.dup_image_file_name)),
-                                           arcname=os.path.join(clean_file_name(uf.unique_with_image_file_name),
+                zip_unique_similar.write(os.path.join(TMP_WRK, dupf.dup_image_id+ext),
+                                           arcname=os.path.join(uf.unique_with_image_image_id,
                                                                 "duplicates",
-                                                                clean_file_name(dupf.dup_image_file_name)))
+                                                                dupf.dup_image_id+ext))
 
 
 if __name__ == "__main__":
@@ -119,8 +122,9 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    unique_image_hash_pd = pd.DataFrame(columns=['image_file_name', 'hash'])
-    image_matching_hash_pd = pd.DataFrame(columns=['dup_image_file_name', 'match_hash', 'unique_with_image_file_name',
+    unique_image_hash_pd = pd.DataFrame(columns=['image_file_name', 'image_id', 'hash'])
+    image_matching_hash_pd = pd.DataFrame(columns=['dup_image_file_name', 'dup_image_id', 'match_hash',
+                                                   'unique_with_image_file_name', 'unique_with_image_image_id',
                                                    "match_with_original_hash", "similarity"])
     DEFAULT_CONFIG_PATH = ""
     if args.config_file_loc:
@@ -171,10 +175,12 @@ if __name__ == "__main__":
             for entry in zip_ref.infolist():
                 name = entry.filename
                 clean_name = clean_file_name(name)
+                image_id = str(uuid.uuid4())
+                image_id_ext = image_id + Path(clean_name).suffix
 
                 # Check if it is a directory, if not then process.
                 if not name.endswith('/'):
-                    logging.info("Processing image: '%s'", name)
+                    logging.info("Processing image: '%s', image_id: %s", name, image_id)
                     image = Image.open(zip_ref.open(entry))
                     image_hash = str(imagehash.phash(image))
                     logging.info("Hash for image '%s': '%s'", name, image_hash)
@@ -196,8 +202,10 @@ if __name__ == "__main__":
                     if not matched_hashes_pd.empty:
                         ham_distance = distance.hamming(list(str(matched_hashes_pd.iloc[0]['hash'])),list(image_hash))
                         new_record = pd.Series([name,
+                                                image_id,
                                                 image_hash,
                                                 matched_hashes_pd.iloc[0]['image_file_name'],
+                                                matched_hashes_pd.iloc[0]['image_id'],
                                                 matched_hashes_pd.iloc[0]['hash'],
                                                 ham_distance],
                                                index=image_matching_hash_pd.columns)
@@ -210,34 +218,35 @@ if __name__ == "__main__":
                         # unique
                         if args.output_type.lower() == 'all':
                             zip_ref.extract(name, os.path.join(TMP_WRK))
-                            os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, clean_name)))
+                            os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, image_id_ext)))
                             try:
                                 with zipfile.ZipFile(ZIP_DUPLICATE_IMAGE_OUTPUT, 'a') as zip_output_match_ref:
                                     # root of the matching files is the first encountered filename, and duplicates are
                                     # saved in a subfolder called duplicates
-                                    logging.info("Storing duplicate file %s that matched with unique file %s", name,
-                                                 matched_hashes_pd.iloc[0]['image_file_name'])
-                                    duplicate_file_path = os.path.join(matched_hashes_pd.iloc[0]['image_file_name'],
-                                                                       "duplicates",
-                                                                       name)
+                                    logging.info("Storing duplicate file %s (image_id= %s) that matched with unique "
+                                                 "file %s (image_id=%s)", name, image_id,
+                                                 matched_hashes_pd.iloc[0]['image_file_name'],
+                                                 matched_hashes_pd.iloc[0]['image_id'])
+
                                     if args.separate_similar.lower() == 'y':
                                         if ham_distance != 0:
-                                            zip_output_match_ref.write(os.path.join(TMP_WRK, clean_name),
+                                            zip_output_match_ref.write(os.path.join(TMP_WRK, image_id_ext),
                                                                        arcname=os.path.join("/similar_match/",
-                                                                                            clean_name))
+                                                                                            image_id_ext))
                                         else:
-                                            zip_output_match_ref.write(os.path.join(TMP_WRK, clean_name),
+                                            zip_output_match_ref.write(os.path.join(TMP_WRK, image_id_ext),
                                                                        arcname=os.path.join("/exact_match/",
-                                                                                            clean_name))
+                                                                                            image_id_ext))
                                     else:
-                                        zip_output_match_ref.write(os.path.join(TMP_WRK, clean_name), arcname=clean_name)
+                                        zip_output_match_ref.write(os.path.join(TMP_WRK, image_id_ext), arcname=image_id)
                             except Exception as ex:
-                                logging.info("Unable to open %s during processing of %s, error: ",
-                                             ZIP_DUPLICATE_IMAGE_OUTPUT, str(ex))
+                                logging.info("Unable to open %s during processing of %s (image_id= %s), error: %s ",
+                                             ZIP_DUPLICATE_IMAGE_OUTPUT, name, image_id, str(ex))
                                 error_cnt = error_cnt + 1
 
                     else:
                         new_record = pd.Series([name,
+                                                image_id,
                                                 image_hash],
                                                index=unique_image_hash_pd.columns)
                         unique_image_hash_pd = pd.concat([unique_image_hash_pd, pd.DataFrame([new_record])],
@@ -247,16 +256,17 @@ if __name__ == "__main__":
                         # store in the image in the output folder
                         if args.output_type.lower() == 'all' or args.output_type.lower() == 'unique':
                             zip_ref.extract(name, os.path.join(TMP_WRK))
-                            os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, clean_name)))
+                            os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, image_id_ext)))
                             try:
                                 with zipfile.ZipFile(ZIP_UNIQUE_IMAGE_OUTPUT, 'a') as zip_output_unique_ref:
                                     # root of the matching files is the first encountered filename, and duplicates are
                                     # saved in a subfolder called duplicates
-                                    zip_output_unique_ref.write(os.path.join(TMP_WRK, clean_name), arcname=clean_name)
-                                    logging.info("unique file name = %s, added to unique file output", name)
+                                    zip_output_unique_ref.write(os.path.join(TMP_WRK, image_id_ext), arcname=image_id)
+                                    logging.info("unique file name = %s (image_id= %s), added to unique file output",
+                                                 name, image_id)
                             except Exception as ex:
-                                logging.info("Unable to open %s during processing of %s, error: %s",
-                                             ZIP_UNIQUE_IMAGE_OUTPUT, name, str(ex))
+                                logging.info("Unable to open %s during processing of %s (image_id= %s), error: %s",
+                                             ZIP_UNIQUE_IMAGE_OUTPUT, name, image_id, str(ex))
                                 error_cnt = error_cnt + 1
 
     logging.info("Total unique images: %s", len(unique_image_hash_pd))
