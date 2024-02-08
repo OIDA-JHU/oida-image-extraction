@@ -121,7 +121,7 @@ if __name__ == "__main__":
     image_matching_hash_pd = pd.DataFrame(columns=['dup_image_file_name', 'match_hash', 'unique_with_image_file_name',
                                                    "match_with_original_hash", "similarity"])
 
-    DEFAULT_CONFIG_PATH = os.path.join('..\config', 'dedup_config.yaml')
+    DEFAULT_CONFIG_PATH = os.path.join('..', 'config', 'dedup_config.yaml')
     config = load_config(DEFAULT_CONFIG_PATH)
     MATCH_IMAGE_FULL_PATH = ''
     if args.match_images_file:
