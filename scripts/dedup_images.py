@@ -238,7 +238,7 @@ if __name__ == "__main__":
                                                                        arcname=os.path.join("/exact_match/",
                                                                                             image_id_ext))
                                     else:
-                                        zip_output_match_ref.write(os.path.join(TMP_WRK, image_id_ext), arcname=image_id)
+                                        zip_output_match_ref.write(os.path.join(TMP_WRK, image_id_ext), arcname=image_id_ext)
                             except Exception as ex:
                                 logging.info("Unable to open %s during processing of %s (image_id= %s), error: %s ",
                                              ZIP_DUPLICATE_IMAGE_OUTPUT, name, image_id, str(ex))
@@ -261,7 +261,7 @@ if __name__ == "__main__":
                                 with zipfile.ZipFile(ZIP_UNIQUE_IMAGE_OUTPUT, 'a') as zip_output_unique_ref:
                                     # root of the matching files is the first encountered filename, and duplicates are
                                     # saved in a subfolder called duplicates
-                                    zip_output_unique_ref.write(os.path.join(TMP_WRK, image_id_ext), arcname=image_id)
+                                    zip_output_unique_ref.write(os.path.join(TMP_WRK, image_id_ext), arcname=image_id_ext)
                                     logging.info("unique file name = %s (image_id= %s), added to unique file output",
                                                  name, image_id)
                             except Exception as ex:
