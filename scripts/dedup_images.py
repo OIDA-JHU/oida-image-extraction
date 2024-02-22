@@ -97,19 +97,6 @@ if __name__ == "__main__":
                              "only want to process a subset of images, but against the whole corpus of images. If not "
                              "specified, the input will be treated as the entire image corpus.")
     '''
-    parser.add_argument("--image_similarity", dest="image_threshold", help="Deduplicate on similarity and use this "
-                                                                           "argument as the threshold.")
-    parser.add_argument("--separate_similar_images",
-                        dest="separate_similar",
-                        default="y",
-                        choices=["Y", "N", "y", "n"],
-                        help="Store similarly matched images separate from exact matches.")
-    parser.add_argument("--group_similar_with_unique",
-                        dest="separate_similar",
-                        default="y",
-                        choices=["Y", "N", "y", "n"],
-                        help="In a separate output, put all the unique photos in a folder with all the similarly "
-                             "matched images.")
     parser.add_argument("--matching_images_file", dest="match_images_file", help="If this parameter is supplied, it "
                                                                                  "will take the list of matching file "
                                                                                  "IDs and output them to the path. "
@@ -139,9 +126,6 @@ if __name__ == "__main__":
     else:
         MATCH_IMAGE_FULL_PATH = os.path.join(config['data_output']['matching_images_csv_dir'],
                                              config['data_output']['matching_images_csv_filename'])
-    SIMILAR_THRESHOLD = float(0.0)
-    if args.image_threshold:
-        SIMILAR_THRESHOLD = float(args.image_threshold)
 
     LOG_FILE = os.path.join(config['data_output']['dedup_log_file_dir'],
                             config['data_output']['dedup_log_file_name'])
@@ -168,6 +152,7 @@ if __name__ == "__main__":
     logging.info("Application Logging Initialized")
     logging.info("Saving duplicated image list here: %s", MATCH_IMAGE_FULL_PATH)
 
+    matched_hashes_pd = pd.DataFrame()
     for zip_path in args.inputs:
 
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -185,17 +170,7 @@ if __name__ == "__main__":
                     image_hash = str(imagehash.phash(image))
                     logging.info("Hash for image '%s': '%s'", name, image_hash)
 
-                    matched_hashes_pd = pd.DataFrame()
-
-                    try:
-                        if SIMILAR_THRESHOLD == 0:
-                            matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'] == image_hash]
-                        else:
-                            matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'].apply(
-                                lambda x: distance.hamming(list(str(x)), list(image_hash))) < SIMILAR_THRESHOLD]
-                    except Exception as ex:
-                        logging.info("Error trying to find duplicate in the unique dataset: %s", str(ex))
-                        error_cnt = error_cnt + 1
+                    matched_hashes_pd = unique_image_hash_pd[unique_image_hash_pd['hash'] == image_hash]
 
                     # if there is a matching hash then put in the image_matching_hash_pd
                     # otherwise not match exists then put in image_hash_pd
@@ -268,6 +243,15 @@ if __name__ == "__main__":
                                 logging.info("Unable to open %s during processing of %s (image_id= %s), error: %s",
                                              ZIP_UNIQUE_IMAGE_OUTPUT, name, image_id, str(ex))
                                 error_cnt = error_cnt + 1
+
+    # remove any hash matches in image_matching_hash_pd from unique_image_hash_pd
+
+    # save all images that didn't have a match
+
+    #
+
+    # Output the files in the image_matching_hash_pd (files where two images have the same hash)
+
 
     logging.info("Total unique images: %s", len(unique_image_hash_pd))
     logging.info("Total duplicates found: %s", len(image_matching_hash_pd))
