@@ -49,11 +49,6 @@ def format_duration(seconds):
     return f"{int(hours)}h {int(minutes)}m {seconds:.2f}s"
 
 
-def clean_file_name(fn):
-    pattern = r"^.*?(?=[a-z]{4}[0-9]{4}\.zip)"
-    return re.sub(pattern, '', fn)
-
-
 def output_unique_with_similar(matching_pd, output_dir):
     full_output_dir = os.path.join(output_dir, 'group_similar_output.zip')
     # Get all the unique keys in the column
@@ -109,7 +104,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    unique_image_hash_pd = pd.DataFrame(columns=['image_file_name', 'image_id', 'hash'])
+    unique_image_hash_pd = pd.DataFrame(columns=['original_image_file_name', 'image_id', 'hash'])
     image_matching_hash_pd = pd.DataFrame(columns=['dup_image_file_name', 'dup_image_id', 'match_hash',
                                                    'unique_with_image_file_name', 'unique_with_image_image_id',
                                                    "match_with_original_hash", "similarity"])
@@ -159,7 +154,6 @@ if __name__ == "__main__":
             # Iterate over each item
             for entry in zip_ref.infolist():
                 name = entry.filename
-                clean_name = clean_file_name(name)
                 image_id = str(uuid.uuid4())
                 image_id_ext = image_id + Path(clean_name).suffix
 
