@@ -44,6 +44,21 @@ def format_duration(seconds):
     return f"{int(hours)}h {int(minutes)}m {seconds:.2f}s"
 
 
+def output_files(tmp_wrk_path, output_path, df):
+    file_error_cnt = 0
+    for row in df.itertuples(index=True, name='Pandas'):
+        try:
+            with zipfile.ZipFile(output_path, 'a') as zip_output_unique_ref:
+                file_name_ext = row.image_id + row.file_ext
+                zip_output_unique_ref.write(os.path.join(tmp_wrk_path, file_name_ext), arcname=file_name_ext)
+                logging.info("added file = %s (image_id= %s), to output", row.original_file_name, row.image_id)
+        except Exception as ex:
+            logging.info("Unable to open %s during processing of %s (image_id= %s), error: %s",
+                         output_path, row.original_file_name, row.image_id, str(ex))
+            file_error_cnt = file_error_cnt + 1
+    return file_error_cnt
+
+
 if __name__ == "__main__":
     start_time = time.time()
     print("Python version:", sys.version)
@@ -63,12 +78,6 @@ if __name__ == "__main__":
                              "only want to process a subset of images, but against the whole corpus of images. If not "
                              "specified, the input will be treated as the entire image corpus.")
     '''
-    parser.add_argument("--processed_images_file", dest="ps_images_file", help="If this parameter is supplied, it will "
-                                                                               "take the list of matching file IDs and "
-                                                                               "output them to the path. This will "
-                                                                               "override the setting in the "
-                                                                               "dedup_config.yaml")
-    parser.add_argument("--image_ext", dest="image_ext")
     parser.add_argument("--config_file", dest="config_file_loc", help="Override the default location of the config "
                                                                       "file. Include the file name in the path.")
     args = parser.parse_args()
@@ -76,6 +85,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     image_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash', 'file_size'])
+    image_unique_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash', 'file_size'])
+    image_dup_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash', 'file_size'])
 
     DEFAULT_CONFIG_PATH = ""
     if args.config_file_loc:
@@ -84,12 +95,14 @@ if __name__ == "__main__":
         DEFAULT_CONFIG_PATH = os.path.join('..', 'config', 'dedup_config.yaml')
     config = load_config(DEFAULT_CONFIG_PATH)
 
-    PROCESS_IMAGE_FULL_PATH = ''
-    if args.ps_images_file:
-        PROCESS_IMAGE_FULL_PATH = args.ps_images_file
-    else:
-        PROCESS_IMAGE_FULL_PATH = os.path.join(config['data_output']['process_images_csv_dir'],
-                                               config['data_output']['process_images_csv_filename'])
+    PROCESS_IMAGE_FULL_PATH = os.path.join(config['data_output']['output_image_csv_dir'],
+                                           config['data_output']['process_images_csv_filename'])
+
+    UNIQUE_IMAGE_FULL_PATH = os.path.join(config['data_output']['output_image_csv_dir'],
+                                          config['data_output']['unique_images_csv_filename'])
+
+    DUPLICATE_IMAGE_FULL_PATH = os.path.join(config['data_output']['output_image_csv_dir'],
+                                             config['data_output']['duplicate_images_csv_filename'])
 
     LOG_FILE = os.path.join(config['data_output']['dedup_log_file_dir'],
                             config['data_output']['dedup_log_file_name'])
@@ -114,7 +127,9 @@ if __name__ == "__main__":
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     logging.getLogger('').addHandler(file_handler)
     logging.info("Application Logging Initialized")
-    logging.info("Saving duplicated image list here: %s", PROCESS_IMAGE_FULL_PATH)
+    logging.info("Saving processed image list here: %s", PROCESS_IMAGE_FULL_PATH)
+    logging.info("Saving unique image list here: %s", UNIQUE_IMAGE_FULL_PATH)
+    logging.info("Saving duplicate image list here: %s", DUPLICATE_IMAGE_FULL_PATH)
 
     matched_hashes_pd = pd.DataFrame()
     for zip_path in args.inputs:
@@ -129,39 +144,41 @@ if __name__ == "__main__":
 
                 if not name.endswith('/'):
                     logging.info("Processing image: '%s', image_id: %s", name, image_id)
-                    image = Image.open(zip_ref.open(entry))
-                    image_hash = str(imagehash.phash(image))
 
-                    zip_ref.extract(name, os.path.join(TMP_WRK))
-                    os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, image_id_ext)))
-                    image_size = os.path.getsize(os.path.join(TMP_WRK, image_id_ext))
+                    try:
+                        image = Image.open(zip_ref.open(entry))
+                        image_hash = str(imagehash.phash(image))
 
-                    new_record = pd.Series([name,
-                                            image_id,
-                                            ext,
-                                            image_hash,
-                                            image_size
-                                            ],
-                                           index=image_df.columns)
+                        zip_ref.extract(name, os.path.join(TMP_WRK))
+                        os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, image_id_ext)))
+                        image_size = os.path.getsize(os.path.join(TMP_WRK, image_id_ext))
 
-                    image_df = pd.concat([image_df, pd.DataFrame([new_record])], ignore_index=True)
+                        new_record = pd.Series([name,
+                                                image_id,
+                                                ext,
+                                                image_hash,
+                                                image_size
+                                                ],
+                                               index=image_df.columns)
+
+                        image_df = pd.concat([image_df, pd.DataFrame([new_record])], ignore_index=True)
+                    except Exception as ex:
+                        logging.info("Error processing image. Name = %s, ImageID = %s ", name, image_id)
+                        error_cnt = error_cnt + 1
 
     # get all the unique images into a DF
-    # get all the duplicate images into a DF
+    image_unique_df = image_df.drop_duplicates(subset=['hash', 'file_size'])
 
-    for row in image_df.itertuples(index=True, name='Pandas'):
-        try:
-            with zipfile.ZipFile(ZIP_UNIQUE_IMAGE_OUTPUT, 'a') as zip_output_unique_ref:
-                file_name_ext = row.image_id + row.file_ext
-                zip_output_unique_ref.write(os.path.join(TMP_WRK, file_name_ext), arcname=file_name_ext)
-                logging.info("added file = %s (image_id= %s), to output", row.original_file_name, row.image_id)
-        except Exception as ex:
-            logging.info("Unable to open %s during processing of %s (image_id= %s), error: %s",
-                         ZIP_UNIQUE_IMAGE_OUTPUT, row.original_file_name, row.image_id, str(ex))
-            error_cnt = error_cnt + 1
+    # get all the duplicated images into a DF
+    image_dup_mask = ~image_df['image_id'].isin(image_unique_df['image_id'])
+    image_dup_df = image_df[image_dup_mask]
+
+    error_cnt = error_cnt + output_files(TMP_WRK, ZIP_UNIQUE_IMAGE_OUTPUT, image_unique_df)
+    error_cnt = error_cnt + output_files(TMP_WRK, ZIP_DUPLICATE_IMAGE_OUTPUT, image_dup_df)
 
     logging.info("Total images processed: %s", len(image_df))
-    logging.info("Total duplicates found: %s", len(image_df))
+    logging.info("Total unique images: %s", len(image_unique_df))
+    logging.info("Total duplicates found: %s", len(image_dup_df))
     logging.info("Total errors: %s", error_cnt)
 
     # cleanup temp dir
@@ -171,5 +188,10 @@ if __name__ == "__main__":
     if len(image_df) > 0:
         image_df.to_csv(PROCESS_IMAGE_FULL_PATH, index=False, header=True, encoding='utf-8', sep=',')
 
-    logging.info("Image extraction run time: " + format_duration(time.time() - start_time))
+    if len(image_unique_df) > 0:
+        image_unique_df.to_csv(UNIQUE_IMAGE_FULL_PATH, index=False, header=True, encoding='utf-8', sep=',')
 
+    if len(image_dup_df) > 0:
+        image_dup_df.to_csv(DUPLICATE_IMAGE_FULL_PATH, index=False, header=True, encoding='utf-8', sep=',')
+
+    logging.info("Image extraction run time: " + format_duration(time.time() - start_time))
