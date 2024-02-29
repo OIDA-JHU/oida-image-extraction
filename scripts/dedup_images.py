@@ -1,7 +1,7 @@
 import argparse
 import logging
 import os
-import re
+import hashlib
 import sys
 import time
 import uuid
@@ -84,9 +84,9 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    image_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash', 'file_size'])
-    image_unique_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash', 'file_size'])
-    image_dup_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash', 'file_size'])
+    image_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash'])
+    image_unique_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash'])
+    image_dup_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash'])
 
     DEFAULT_CONFIG_PATH = ""
     if args.config_file_loc:
@@ -146,18 +146,21 @@ if __name__ == "__main__":
                     logging.info("Processing image: '%s', image_id: %s", name, image_id)
 
                     try:
-                        image = Image.open(zip_ref.open(entry))
-                        image_hash = str(imagehash.phash(image))
+                        zip_ref.extract(name, TMP_WRK)
+                        tmp_path_name = str(os.path.join(TMP_WRK, image_id_ext))
+                        os.rename(str(os.path.join(TMP_WRK, name)), tmp_path_name)
 
-                        zip_ref.extract(name, os.path.join(TMP_WRK))
-                        os.rename(str(os.path.join(TMP_WRK, name)), str(os.path.join(TMP_WRK, image_id_ext)))
-                        image_size = os.path.getsize(os.path.join(TMP_WRK, image_id_ext))
+                        hash_md5 = hashlib.md5()
+                        with open(tmp_path_name, 'rb') as f:
+                            for chunk in iter(lambda: f.read(4096), b""):
+                                hash_md5.update(chunk)
+
+                        hash = str(hash_md5.hexdigest())
 
                         new_record = pd.Series([name,
                                                 image_id,
                                                 ext,
-                                                image_hash,
-                                                image_size
+                                                hash
                                                 ],
                                                index=image_df.columns)
 
@@ -167,7 +170,7 @@ if __name__ == "__main__":
                         error_cnt = error_cnt + 1
 
     # get all the unique images into a DF
-    image_unique_df = image_df.drop_duplicates(subset=['hash', 'file_size'])
+    image_unique_df = image_df.drop_duplicates(subset=['hash'])
 
     # get all the duplicated images into a DF
     image_dup_mask = ~image_df['image_id'].isin(image_unique_df['image_id'])
