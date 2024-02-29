@@ -10,8 +10,6 @@ from pathlib import Path
 import yaml
 import zipfile
 import pandas as pd
-from PIL import Image
-import imagehash
 
 
 def load_config(config_path):
