@@ -88,11 +88,10 @@ if __name__ == "__main__":
     image_unique_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash'])
     image_dup_df = pd.DataFrame(columns=['original_file_name', 'image_id', 'file_ext', 'hash'])
 
-    DEFAULT_CONFIG_PATH = ""
+    DEFAULT_CONFIG_PATH = os.path.join('..', 'config', 'dedup_config.yaml')
     if args.config_file_loc:
         DEFAULT_CONFIG_PATH = args.config_file_loc
-    else:
-        DEFAULT_CONFIG_PATH = os.path.join('..', 'config', 'dedup_config.yaml')
+
     config = load_config(DEFAULT_CONFIG_PATH)
 
     PROCESS_IMAGE_FULL_PATH = os.path.join(config['data_output']['output_image_csv_dir'],
