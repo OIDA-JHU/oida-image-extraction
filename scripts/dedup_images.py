@@ -127,7 +127,11 @@ if __name__ == "__main__":
     logging.info("Saving processed image list here: %s", PROCESS_IMAGE_FULL_PATH)
     logging.info("Saving unique image list here: %s", UNIQUE_IMAGE_FULL_PATH)
     logging.info("Saving duplicate image list here: %s", DUPLICATE_IMAGE_FULL_PATH)
+    logging.info("Saving log file here: %s", LOG_FILE)
+    logging.info("Saving unique image zip file here: %s", ZIP_UNIQUE_IMAGE_OUTPUT)
+    logging.info("Saving duplicate image zip file here: %s", ZIP_DUPLICATE_IMAGE_OUTPUT)
 
+    logging.info("Starting MD5 hash computing: " + format_duration(time.time() - start_time))
     matched_hashes_pd = pd.DataFrame()
     for zip_path in args.inputs:
 
@@ -166,6 +170,7 @@ if __name__ == "__main__":
                         logging.info("Error processing image. Name = %s, ImageID = %s ", name, image_id)
                         error_cnt = error_cnt + 1
 
+    logging.info("Finished computing MD5 hashes run time: " + format_duration(time.time() - start_time))
     # get all the unique images into a DF
     image_unique_df = image_df.drop_duplicates(subset=['hash'])
 
@@ -173,8 +178,10 @@ if __name__ == "__main__":
     image_dup_mask = ~image_df['image_id'].isin(image_unique_df['image_id'])
     image_dup_df = image_df[image_dup_mask]
 
+    logging.info("Starting zip output: " + format_duration(time.time() - start_time))
     error_cnt = error_cnt + output_files(TMP_WRK, ZIP_UNIQUE_IMAGE_OUTPUT, image_unique_df)
     error_cnt = error_cnt + output_files(TMP_WRK, ZIP_DUPLICATE_IMAGE_OUTPUT, image_dup_df)
+    logging.info("Zip output complete: " + format_duration(time.time() - start_time))
 
     logging.info("Total images processed: %s", len(image_df))
     logging.info("Total unique images: %s", len(image_unique_df))
@@ -194,4 +201,4 @@ if __name__ == "__main__":
     if len(image_dup_df) > 0:
         image_dup_df.to_csv(DUPLICATE_IMAGE_FULL_PATH, index=False, header=True, encoding='utf-8', sep=',')
 
-    logging.info("Image extraction run time: " + format_duration(time.time() - start_time))
+    logging.info("Total deduplication run time: " + format_duration(time.time() - start_time))
