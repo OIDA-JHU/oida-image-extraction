@@ -61,11 +61,12 @@ if __name__ == "__main__":
     start_time = time.time()
     print("Python version:", sys.version)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output_type", dest="output_type", help="'unique': Zip archive to store the unique images "
-                                                                  "or `all': Zip archive that includes a folder for "
-                                                                  "each unique image, and a subfolder containing all "
-                                                                  "duplicates. This is useful when using similarity "
-                                                                  "of images", required=True)
+    parser.add_argument("--output_type",
+                        dest="output_type",
+                        help="'unique': Only save the unique files or `all': Saves both unique files and the duplicate "
+                             "files. Default is unique.",
+                        required=True,
+                        default="unique")
     parser.add_argument("--inputs", dest="inputs", nargs="+", help="Zip archives of images to deduplicate",
                         required=True)
 
@@ -179,10 +180,14 @@ if __name__ == "__main__":
     image_dup_df = image_df[image_dup_mask]
 
     logging.info("Starting zip output: " + format_duration(time.time() - start_time))
-    error_cnt = error_cnt + output_files(TMP_WRK, ZIP_UNIQUE_IMAGE_OUTPUT, image_unique_df)
-    error_cnt = error_cnt + output_files(TMP_WRK, ZIP_DUPLICATE_IMAGE_OUTPUT, image_dup_df)
-    logging.info("Zip output complete: " + format_duration(time.time() - start_time))
 
+    if args.output_type.lower() == 'all':
+        error_cnt = error_cnt + output_files(TMP_WRK, ZIP_UNIQUE_IMAGE_OUTPUT, image_unique_df)
+        error_cnt = error_cnt + output_files(TMP_WRK, ZIP_DUPLICATE_IMAGE_OUTPUT, image_dup_df)
+    else:
+        error_cnt = error_cnt + output_files(TMP_WRK, ZIP_UNIQUE_IMAGE_OUTPUT, image_unique_df)
+
+    logging.info("Zip output complete: " + format_duration(time.time() - start_time))
     logging.info("Total images processed: %s", len(image_df))
     logging.info("Total unique images: %s", len(image_unique_df))
     logging.info("Total duplicates found: %s", len(image_dup_df))
