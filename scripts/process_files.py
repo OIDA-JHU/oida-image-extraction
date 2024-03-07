@@ -12,10 +12,14 @@ import zipfile
 import tarfile
 import tempfile
 import shutil
+import yaml
 
 
-logger = logging.getLogger("process_files")
+def load_config(config_path):
+    with open(config_path, 'r') as file:
+        loaded_data = yaml.safe_load(file)
 
+    return loaded_data
 
 # Extracts images, recursing into zip/tar archives as needed,
 # keeping a counter and only writing to output file if between
@@ -42,9 +46,9 @@ def process_file(
         ext = re.match(r".*?((\.tar)?\.[^\.]+)$", fname.lower())
         ext = ext.group(1) if ext else None
         name = os.path.join(prefix, fname.strip("/"))
-        logger.debug("Processing file '%s'", fname)
+        logging.debug("Processing file '%s'", fname)
         if ext in zip_exts:
-            logger.debug("Recursively processing a zip file")
+            logging.debug("Recursively processing a zip file")
             try:
                 with zipfile.ZipFile(fhandle, "r") as nested_ifd:
                     for nested_fname in nested_ifd.namelist():
@@ -63,14 +67,14 @@ def process_file(
                             tar_exts=tar_exts
                         )
             except zipfile.BadZipFile as bad_zip_error:
-                logger.info("Unable to open archive at index at %s for file %s. Err msg: %s",
+                logging.info("Unable to open archive at index at %s for file %s. Err msg: %s",
                             current_index, name, bad_zip_error)
             except Exception as unknown_error:
-                logger.info("Unknown error opening archive at index at %s for file %s. Err msg: %s",
+                logging.info("Unknown error opening archive at index at %s for file %s. Err msg: %s",
                             current_index, name, unknown_error)
 
         elif ext in old_exts:
-            logger.debug("Treating '%s' as old Microsoft format", fname)
+            logging.debug("Treating '%s' as old Microsoft format", fname)
             input_fname = os.path.join(temp_path, os.path.basename(fname))
             with open(input_fname, "wb") as ofd:
                 ofd.write(fhandle.read())
@@ -102,13 +106,13 @@ def process_file(
         elif ext in image_exts:
             current_index += 1
             if current_index > min_index:
-                logger.debug("Adding image to archive as '%s'", name)
+                logging.debug("Adding image to archive as '%s'", name)
                 with final_ofd.open(name, "w") as image_ofd:
                     image_ofd.write(fhandle.read())
             else:
-                logger.debug("Skipping image '%s'", name)
+                logging.debug("Skipping image '%s'", name)
         elif ((sys.version_info >= (3,9) and tarfile.is_tarfile(fhandle)) or ext in tar_exts):
-            logger.debug("Recursively processing a tar file")
+            logging.debug("Recursively processing a tar file")
             with tarfile.open(fileobj=fhandle) as nested_ifd:
                 for member in nested_ifd:
                     current_index = process_file(
@@ -126,7 +130,7 @@ def process_file(
                         tar_exts=tar_exts
                     )
         else:
-            logger.debug("Skipping file with unknown extension/content ('%s')", fname)
+            logging.debug("Skipping file with unknown extension/content ('%s')", fname)
     return current_index
 
 
@@ -141,15 +145,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         dest="inputs", 
-        nargs="+", 
-        help="Any number and mixture of Powerpoint and Excel files to process (or zip/tar files in archive mode)",
+        nargs="*",
+        help="Any number and mixture of Powerpoint and Excel files to process (or zip/tar files in archive mode). "
+             "If specifying input_dir=TRUE, then this should be a directory.",
     )
-    parser.add_argument("--output", dest="output", help="Zip file to append extracted images to (will be created if "
-                                                        "necessary)", required=True)
-    parser.add_argument("--input_dir", dest="input_dir",
+    parser.add_argument("--output",
+                        dest="output",
+                        help="Zip file to append extracted images to (will be created if necessary)",
+                        required=False)
+    parser.add_argument("--input_dir",
+                        dest="input_dir",
                         help="A boolean value whether the inputs is a list of file(s) or list of directories.",
-                        default="FALSE",
-                        choices=["TRUE", "FALSE", "true", "false"])
+                        choices=["TRUE", "FALSE", "true", "false"],
+                        required=False)
     parser.add_argument("--start", dest="start", default=0, type=int, help="Which image index to start saving at")
     parser.add_argument("--count", dest="count",  type=int, help="How many images to save")
     parser.add_argument("--image_extensions", dest="image_extensions", nargs="*", default=[".jpg", ".jpeg", ".png"])
@@ -157,12 +165,45 @@ if __name__ == "__main__":
     parser.add_argument("--old_extensions", dest="old_extensions", nargs="*", default=[".ppt", ".xls"])
     parser.add_argument("--tar_extensions", dest="tar_extensions", nargs="*",
                         default=[".tar", ".tgz", ".tbz2", ".tar.bz2", ".tar.gz"])
+    parser.add_argument("--log_file",
+                        dest="log_file",
+                        help="Overrides the parameter `output_file` in the process_config.yaml. Include the full path "
+                             "and file name.")
+    parser.add_argument("--config_file",
+                        dest="config_file",
+                        help="Overrides the parameter `output_file` in the process_config.yaml. Include the full path "
+                             "and file name.")
     parser.add_argument("--log_level", dest="log_level", choices=["DEBUG", "INFO", "WARN", "ERROR"], default="INFO")
     args = parser.parse_args()
 
+    # Setup configuration
+    config_path = os.path.join('..', 'config', 'process_config.yaml')
+    if args.config_file:
+        config_path = args.config_file
+
+    config = load_config(config_path)
+
+    if not args.log_file:
+        args.log_file = os.path.join(config['data_output']['process_log_file'])
+
+    if not args.output:
+        args.output = os.path.join(config['data_output']['output_file'])
+
+    if not args.input_dir:
+        if os.path.join(config['data_input']['input_dir']):
+            args.input_dir = 'TRUE'
+            args.inputs = os.path.join(config['data_input']['input_dir'])
+
+
     # Prints lots of information while running: set the log level to e.g. "WARN" 
     # for less verbosity.
-    logging.basicConfig(level=getattr(logging, args.log_level))
+    # logging.basicConfig(level=getattr(logging, args.log_level))
+    logging.basicConfig(level=getattr(logging, "DEBUG"))
+
+    file_handler = logging.FileHandler(args.log_file)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logging.getLogger("process_files").addHandler(file_handler)
+    logging.info("Application Logging Initialized")
 
     # The temporary path is used for invoking the command-line
     # 'hachoir' tool.
@@ -171,11 +212,11 @@ if __name__ == "__main__":
     current_index = 0
     try:
         with zipfile.ZipFile(args.output, "w") as ofd:
-            if args.input_dir == 'FALSE':
+            if args.input_dir.upper() == 'FALSE':
                 for fname in args.inputs:
-                    logger.info("Processing individual top-level file '%s'", fname)
+                    logging.info("Processing individual top-level file '%s'", fname)
                     with open(fname, "rb") as ifd:
-                        logger.info("Opened top level file '%s'", fname)
+                        logging.info("Opened top level file '%s'", fname)
                         current_index = process_file(
                             ofd,
                             current_index,
@@ -189,15 +230,15 @@ if __name__ == "__main__":
                             min_index=args.start,
                             max_index=args.start + args.count if args.count else None
                         )
-                        logger.info("Done processing top-level file '%s'", fname)
-            elif args.input_dir == 'TRUE':
-                logger.info("Processing input directory")
+                        logging.info("Done processing top-level file '%s'", fname)
+            elif args.input_dir.upper() == 'TRUE':
+                logging.info("Processing input directory")
                 for dir in args.inputs:
                     for dirpath, dirnames, filenames in os.walk(dir):
                         for file_name in filenames:
                             file_path = os.path.join(dirpath, file_name)
                             with open(file_path, "rb") as ifd:
-                                logger.info("Open file in input directory '%s'", file_path)
+                                logging.info("Open file in input directory '%s'", file_path)
                                 current_index = process_file(
                                     ofd,
                                     current_index,
@@ -211,13 +252,13 @@ if __name__ == "__main__":
                                     min_index=args.start,
                                     max_index=args.start + args.count if args.count else None
                                 )
-                                logger.info("Processed file at index: %s", current_index)
+                                logging.info("Processed file at index: %s", current_index)
             else:
-                logger.error("No specified input directory or file names.")
+                logging.error("No specified input directory or file names.")
     except Exception as e:
         raise e
     finally:
         # Clean up temporary path used for hachoir subprocesses.
         shutil.rmtree(temp_path)
 
-    logger.info("Image extraction run time: " + format_duration(time.time() - start_time))
+    logging.info("Image extraction run time: " + format_duration(time.time() - start_time))
