@@ -168,7 +168,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_file",
                         dest="log_file",
                         help="Overrides the parameter `output_file` in the process_config.yaml. Include the full path "
-                             "and file name.")
+                             "and file name e.g. /output/logfile.txt")
     parser.add_argument("--config_file",
                         dest="config_file",
                         help="Overrides the parameter `output_file` in the process_config.yaml. Include the full path "
@@ -192,17 +192,16 @@ if __name__ == "__main__":
     if not args.input_dir:
         if os.path.join(config['data_input']['input_dir']):
             args.input_dir = 'TRUE'
-            args.inputs = os.path.join(config['data_input']['input_dir'])
+            args.inputs.append(os.path.join(config['data_input']['input_dir']))
 
 
     # Prints lots of information while running: set the log level to e.g. "WARN" 
     # for less verbosity.
-    # logging.basicConfig(level=getattr(logging, args.log_level))
-    logging.basicConfig(level=getattr(logging, "DEBUG"))
+    logging.basicConfig(level=getattr(logging, args.log_level))
 
     file_handler = logging.FileHandler(args.log_file)
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    logging.getLogger("process_files").addHandler(file_handler)
+    logging.getLogger('').addHandler(file_handler)
     logging.info("Application Logging Initialized")
 
     # The temporary path is used for invoking the command-line
