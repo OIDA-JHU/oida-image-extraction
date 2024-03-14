@@ -13,6 +13,7 @@ import tarfile
 import tempfile
 import shutil
 import yaml
+from solr_search import SolrSearch
 
 
 def load_config(config_path):
@@ -158,6 +159,15 @@ if __name__ == "__main__":
                         help="A boolean value whether the inputs is a list of file(s) or list of directories.",
                         choices=["TRUE", "FALSE", "true", "false"],
                         required=False)
+    parser.add_argument("--partial_load_query",
+                        dest="partial_load_query",
+                        help="If supplying a partial load query, then a partial load of files will be added to the "
+                             "already existing output. This will query the UCSF index and pull in files based on the "
+                             "query. If the files already exist, it will skip them and log that they were skipped. "
+                             "A separate log will be generated of these files that were added. This argument will "
+                             "override any input argument.",
+                        required=False
+                        )
     parser.add_argument("--start", dest="start", default=0, type=int, help="Which image index to start saving at")
     parser.add_argument("--count", dest="count",  type=int, help="How many images to save")
     parser.add_argument("--image_extensions", dest="image_extensions", nargs="*", default=[".jpg", ".jpeg", ".png"])
@@ -167,12 +177,11 @@ if __name__ == "__main__":
                         default=[".tar", ".tgz", ".tbz2", ".tar.bz2", ".tar.gz"])
     parser.add_argument("--log_file",
                         dest="log_file",
-                        help="Overrides the parameter `output_file` in the process_config.yaml. Include the full path "
-                             "and file name e.g. /output/logfile.txt")
+                        help="Overrides the parameter `process_log_file` in the process_config.yaml. Include the full "
+                             "path and file name e.g. /output/logfile.txt")
     parser.add_argument("--config_file",
                         dest="config_file",
-                        help="Overrides the parameter `output_file` in the process_config.yaml. Include the full path "
-                             "and file name.")
+                        help="Overrides the default location of the process_config.yaml.")
     parser.add_argument("--log_level", dest="log_level", choices=["DEBUG", "INFO", "WARN", "ERROR"], default="INFO")
     args = parser.parse_args()
 
@@ -207,6 +216,13 @@ if __name__ == "__main__":
     # The temporary path is used for invoking the command-line
     # 'hachoir' tool.
     temp_path = tempfile.mkdtemp()
+
+    if args.partial_load_query:
+        query = SolrSearch(args.partial_load_query)
+
+        # query for a number_of_results, default: 'all'
+        query.search(number=config['partial_load']['total_files_download'])
+        results = query.ids_and_scores
 
     current_index = 0
     try:
