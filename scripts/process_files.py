@@ -22,6 +22,11 @@ def load_config(config_path):
 
     return loaded_data
 
+
+def build_partial_load_inputs(partial_load):
+    return partial_load
+
+
 # Extracts images, recursing into zip/tar archives as needed,
 # keeping a counter and only writing to output file if between
 # the minimum and maximum specified indices (stopping early if
@@ -165,7 +170,8 @@ if __name__ == "__main__":
                              "already existing output. This will query the UCSF index and pull in files based on the "
                              "query. If the files already exist, it will skip them and log that they were skipped. "
                              "A separate log will be generated of these files that were added. This argument will "
-                             "override any input argument.",
+                             "override any input argument. The output will append a date timestamp to the zip archive "
+                             "file name.",
                         required=False
                         )
     parser.add_argument("--start", dest="start", default=0, type=int, help="Which image index to start saving at")
@@ -218,11 +224,11 @@ if __name__ == "__main__":
     temp_path = tempfile.mkdtemp()
 
     if args.partial_load_query:
+        logging.info("Processing partial load query: %s", args.partial_load_query)
         query = SolrSearch(args.partial_load_query)
-
-        # query for a number_of_results, default: 'all'
         query.search(number=config['partial_load']['total_files_download'])
         results = query.ids_and_scores
+        args.inputs = build_partial_load_inputs(results)
 
     current_index = 0
     try:
