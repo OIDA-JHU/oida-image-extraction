@@ -1,3 +1,4 @@
+from datetime import datetime
 import subprocess
 import re
 import sys
@@ -23,9 +24,23 @@ def load_config(config_path):
     return loaded_data
 
 
-def build_partial_load_inputs(partial_load):
-    return partial_load
+def build_partial_load_inputs(partial_load, root_dir):
+    full_path_ids = []
+    for file_id in partial_load:
+        leading_letters = ''.join([char for char in file_id if char.isalpha()])
+        # id_part = file_id[len(leading_letters):]
+        id_path = os.path.join(root_dir, *leading_letters, file_id)
+        full_path_ids.append(id_path)
+    return full_path_ids
 
+
+def create_file_name_with_timestamp(file_name_path):
+    dir_name = os.path.dirname(file_name_path)
+    base_name = os.path.basename(file_name_path)
+    file_name, file_ext = os.path.splitext(base_name)
+    timestamp = datetime.now().strftime('%Y%m%d')
+    new_file_name = f"{file_name}_{timestamp}{file_ext}"
+    return os.path.join(dir_name, new_file_name)
 
 # Extracts images, recursing into zip/tar archives as needed,
 # keeping a counter and only writing to output file if between
@@ -161,7 +176,8 @@ if __name__ == "__main__":
                         required=False)
     parser.add_argument("--input_dir",
                         dest="input_dir",
-                        help="A boolean value whether the inputs is a list of file(s) or list of directories.",
+                        help="A boolean value whether the inputs is a list of file(s) or list of directories. If the "
+                             "input_dir is specified in the yaml config. This will default to TRUE",
                         choices=["TRUE", "FALSE", "true", "false"],
                         required=False)
     parser.add_argument("--partial_load_query",
@@ -172,6 +188,18 @@ if __name__ == "__main__":
                              "A separate log will be generated of these files that were added. This argument will "
                              "override any input argument. The output will append a date timestamp to the zip archive "
                              "file name.",
+                        required=False
+                        )
+    parser.add_argument("--partial_load_root_dir",
+                        dest="partial_load_root_dir",
+                        help="This is the root directory of where the specified returned values from the "
+                             "'partial_load_query' will be found. The solr index returns the ID of a file, but the root"
+                             "directory is unknown unless specified by this application. For example the solr index "
+                             "might return ffgd0283, but the file is located at "
+                             "/oida/artifacts/f/f/b/b/ffgd0283/ffgd0283.zip. In this case the root would "
+                             "be: /oida/artifacts. If not specified it will default to 'input_dir' in the config yaml. "
+                             "If no root directory is specified here or in the yaml config, then it will default to "
+                             "the system root directory.",
                         required=False
                         )
     parser.add_argument("--start", dest="start", default=0, type=int, help="Which image index to start saving at")
@@ -209,6 +237,15 @@ if __name__ == "__main__":
             args.input_dir = 'TRUE'
             args.inputs.append(os.path.join(config['data_input']['input_dir']))
 
+    if args.partial_load_query and not args.partial_load_root_dir:
+        # add timestamp to output name for partial loads
+        args.output = create_file_name_with_timestamp(args.output)
+
+        if os.path.join(config['data_input']['input_dir']):
+            args.partial_load_root_dir = os.path.join(config['data_input']['input_dir'])
+        else:
+            args.partial_load_root_dir = os.path.join("/")
+
 
     # Prints lots of information while running: set the log level to e.g. "WARN" 
     # for less verbosity.
@@ -228,8 +265,11 @@ if __name__ == "__main__":
         query = SolrSearch(args.partial_load_query)
         query.search(number=config['partial_load']['total_files_download'])
         results = query.ids_and_scores
-        args.inputs = build_partial_load_inputs(results)
+        args.inputs = build_partial_load_inputs(results, args.partial_load_root_dir)
+        args.input_dir = 'TRUE'
+        # partial loads append a timestamp to the outname automatically
 
+    # results should have ffgd0283, ffhd0283, fggd0283
     current_index = 0
     try:
         with zipfile.ZipFile(args.output, "w") as ofd:
