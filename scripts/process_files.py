@@ -38,7 +38,7 @@ def create_file_name_with_timestamp(file_name_path):
     dir_name = os.path.dirname(file_name_path)
     base_name = os.path.basename(file_name_path)
     file_name, file_ext = os.path.splitext(base_name)
-    timestamp = datetime.now().strftime('%Y%m%d')
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     new_file_name = f"{file_name}_{timestamp}{file_ext}"
     return os.path.join(dir_name, new_file_name)
 
