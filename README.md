@@ -71,6 +71,13 @@ python process_files.py --output /output/output.zip --partial_load_query
 "ddudate:[2023-11-01T00:00:00Z TO 2023-12-01T00:00:00Z] AND (filename:*xls OR filename:*xlsx) AND industry:Opioids"
 ```
 
+For more information regarding the query syntax visit the [OIDA website](https://www.industrydocuments.ucsf.edu/opioids/)
+or the [API documentation](https://www.industrydocuments.ucsf.edu/wp-content/uploads/2020/08/IndustryDocumentsDataAPI_v7.pdf).
+
+**Note:** that some of the parameters that are used in the advanced searches on the OIDA website are not the same for the 
+Solr index. For instance, `dateaddeducsf` and `datemodifieducsf` cannot be used with the Solr index query which is used
+by the `--partial_load_query` parameter. Instead, use `ddudate` or `ddmudate`, as they are the Solr index equivalent 
+to `dateaddeducsf` and `datemodifieducsf`.
 
 # Filter Files
 Given a zip file of images such as produced by the script, a filtered 
