@@ -1,4 +1,6 @@
-# Introduction: OIDA Image Extraction and Deduplication Tool
+# OIDA Image Extraction and Deduplication Tool
+
+## Introduction
 These set of scripts: `process_files.py`, `filter_files.py`, and `dedup_images.py` are part of the first stage of the
 OIDA Image Collection data pipeline. They can be run independently, but are designed to process the images from Excel
 and Powerpoint documents in the Opioid Internet Document Archive and be prepared, analyzed, and curated by researchers.
@@ -13,13 +15,13 @@ arguments.
 Running this step after filtering will improve overall performance as this step is more time-consuming than filtering.
 
   
-# Image Extraction
+## Image Extraction
 The script `scripts/process_files.py` in this repository can be used to extract images from Powerpoint and Excel files 
 in both the older "CFB" Microsoft format, and the newer XML-based format (typically distinguished by an additional "x", 
 e.g. "file.ppt" versus "file.pptx").  For the approximately 900 example files from the OIDA corpus, the script runs in 
 under two minutes on a typical laptop, and extracts approximately 4000 images.
 
-## Running the Image Extraction script
+### Running the Image Extraction script
 On any computer with a recent version of Python (e.g. >3.6) and Git, first clone this repository and change directory 
 into it:
 
@@ -55,14 +57,14 @@ The script also supports specifying a directory to process images. By using the 
 python process_files.py --output /output/output.zip --input_dir TRUE /document_input
 ```
 
-## Input, Processing, and Output
+### Input, Processing, and Output
 The script currently handles the old and new formats of Microsoft Powerpoint and Excel, which it distinguishes based on 
 file extension.  The old formats are searched for known bit-patterns corresponding to file formats 
 (using the Hachoir library), while the new formats are unpacked as zip archives and filtered for image extensions.  In 
 all cases, each image found in a given input file `FILE_NAME` is extracted with name `FILE_NAME/IMAGE_NAME`, and so 
 remains unambiguously associated with its source (nested archives will create longer sequences that will also be unique).
 
-## Partial Loading
+### Partial Loading
 To partially process images to be prepared for loading into the Image Collection, using the `partial_load_query` 
 parameter will take an argument that is a query string, for example:
 
@@ -79,7 +81,7 @@ Solr index. For instance, `dateaddeducsf` and `datemodifieducsf` cannot be used 
 by the `--partial_load_query` parameter. Instead, use `ddudate` or `ddmudate`, as they are the Solr index equivalent 
 to `dateaddeducsf` and `datemodifieducsf`.
 
-# Filter Files
+## Filter Files
 Given a zip file of images such as produced by the script, a filtered 
 archive can be created with:
 
@@ -91,10 +93,10 @@ By default, the filter will exclude files with "thumb" in the name, and images w
 or entropy less than 6.0.  These defaults can be specified differently on the command line, see the script's help 
 message for details (i.e. using the "-h" switch).
 
-# Deduplication
+## Deduplication
 
 
-# Configuration
+## Configuration
 Some of the parameters can be configured in the `process_config.yaml`. The script will default to `./config` to look for
 this configuration file. It can be overridden by using the `--config_file` parameter. The following is an example
 configuration file for the `process_files.py` script:
@@ -121,7 +123,7 @@ partial_load:
 | partial_load_root_dir  | No                                               | Yes, by using `partial_load_root_dir` |
 
 
-# Known Issues and Extending the Code
+## Known Issues and Extending the Code
 
 It might be worthwhile to be more sophisticated about determining input file format, e.g. using magic bytes, 
 particularly if the data sources become less constrained or curated.  This could include the image-extraction stage for
@@ -135,7 +137,7 @@ won't be meaningful.
 The SCons build system probably won't work out-of-the-box in arbitrary environments, but should give a decent idea of 
 how one might run the script over a massive collection on a grid (SLURM etc).
 
-# Authors
+## Authors
 The original code was forked from https://github.com/comp-int-hum/oida-image-extraction and was authored by Tom 
 Lippincott in the [department of computer science at JHU](https://engineering.jhu.edu/faculty/thomas-lippincott/).
 
