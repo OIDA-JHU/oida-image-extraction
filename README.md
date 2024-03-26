@@ -3,24 +3,23 @@ These set of scripts: `process_files.py`, `filter_files.py`, and `dedup_images.p
 OIDA Image Collection data pipeline. They can be run independently, but are designed to process the images from Excel
 and Powerpoint documents in the Opioid Internet Document Archive and be prepared, analyzed, and curated by researchers.
 
-The intended steps in the process of documents are the following:
+The intended steps in the processing of documents are the following:
 
-- Extract Images: Executing the script `scripts/process_files.py` all images will be extracted from the documents 
+1) Extract Images: Executing the script `scripts/process_files.py` all images will be extracted from the documents 
 provided.
-- Filter Images: Executing the script `scripts/filter_files.py` will select only the images with the provided arguments.
-- Deduplication: Executing the script `dedup_images.py` will remove duplicate images based on a MD5 file hash. Running 
-this step before filtering will improve overall performance as this step is more time-consuming than filtering.
+2) Filter Images: Executing the script `scripts/filter_files.py` will select only the images with the provided 
+arguments.
+3) Deduplication: Executing the script `scripts/dedup_images.py` will remove duplicate images based on a MD5 file hash. 
+Running this step after filtering will improve overall performance as this step is more time-consuming than filtering.
 
   
 # Image Extraction
-
 The script `scripts/process_files.py` in this repository can be used to extract images from Powerpoint and Excel files 
 in both the older "CFB" Microsoft format, and the newer XML-based format (typically distinguished by an additional "x", 
 e.g. "file.ppt" versus "file.pptx").  For the approximately 900 example files from the OIDA corpus, the script runs in 
 under two minutes on a typical laptop, and extracts approximately 4000 images.
 
 ## Running the Image Extraction script
-
 On any computer with a recent version of Python (e.g. >3.6) and Git, first clone this repository and change directory 
 into it:
 
@@ -47,7 +46,34 @@ python scripts/process_files.py --output some_output_file.zip file1.xlsx file2.p
 One can optionally specify, in the stream of images extracted from a given run, at which index to start writing to 
 output (i.e. an "offset"), and how many images to keep (this allows massively parallel batch processing).  The set of 
 file extensions considered to be images, zip files, tar archives, etc, can be overridden with arguments 
-(see "python scripts/process_files.py -h").  Given a zip file of images such as produced by the script, a filtered 
+(see "python scripts/process_files.py -h").  
+
+The script also supports specifying a directory to process images. By using the `--input_dir` parameter and using the 
+`TRUE` argument. Example usage:
+
+```
+python process_files.py --output /output/output.zip --input_dir TRUE /document_input
+```
+
+## Input, Processing, and Output
+The script currently handles the old and new formats of Microsoft Powerpoint and Excel, which it distinguishes based on 
+file extension.  The old formats are searched for known bit-patterns corresponding to file formats 
+(using the Hachoir library), while the new formats are unpacked as zip archives and filtered for image extensions.  In 
+all cases, each image found in a given input file `FILE_NAME` is extracted with name `FILE_NAME/IMAGE_NAME`, and so 
+remains unambiguously associated with its source (nested archives will create longer sequences that will also be unique).
+
+## Partial Loading
+To partially process images to be prepared for loading into the Image Collection, using the `partial_load_query` 
+parameter will take an argument that is a query string, for example:
+
+```
+python process_files.py --output /output/output.zip --partial_load_query 
+"ddudate:[2023-11-01T00:00:00Z TO 2023-12-01T00:00:00Z] AND (filename:*xls OR filename:*xlsx) AND industry:Opioids"
+```
+
+
+# Filter Files
+Given a zip file of images such as produced by the script, a filtered 
 archive can be created with:
 
 ```
@@ -58,19 +84,35 @@ By default, the filter will exclude files with "thumb" in the name, and images w
 or entropy less than 6.0.  These defaults can be specified differently on the command line, see the script's help 
 message for details (i.e. using the "-h" switch).
 
-## Input, Processing, and Output
-
-The script currently handles the old and new formats of Microsoft Powerpoint and Excel, which it distinguishes based on 
-file extension.  The old formats are searched for known bit-patterns corresponding to file formats 
-(using the Hachoir library), while the new formats are unpacked as zip archives and filtered for image extensions.  In 
-all cases, each image found in a given input file `FILE_NAME` is extracted with name `FILE_NAME/IMAGE_NAME`, and so 
-remains unambiguously associated with its source (nested archives will create longer sequences that will also be unique).
-
-## Partial Loading
-
-# Filter Files
-
 # Deduplication
+
+
+# Configuration
+Some of the parameters can be configured in the `process_config.yaml`. The script will default to `./config` to look for
+this configuration file. It can be overridden by using the `--config_file` parameter. The following is an example
+configuration file for the `process_files.py` script:
+
+```
+data_output:
+  output_file: '/data_output/output.zip'
+  process_log_file: '/data/process_log_file.txt'
+
+data_input:
+  input_dir: '/input_directory'
+
+partial_load:
+  total_files_download: 'all'
+  partial_load_root_dir: '/partial_load_directory'
+ ```
+
+| Variable               | Required                                         | Can be overridden?                    |
+|------------------------|--------------------------------------------------|---------------------------------------|
+| output_file            | No                                               | Yes, by using `--output`              |
+| process_log_file       | No                                               | Yes, by using `--log_file`            |
+| input_dir              | No                                               | Yes, by using `--input_dir`           |
+| total_files_download   | Yes, only if a partial load is being performed   | No                                    |
+| partial_load_root_dir  | No                                               | Yes, by using `partial_load_root_dir` |
+
 
 # Known Issues and Extending the Code
 
@@ -90,5 +132,5 @@ how one might run the script over a massive collection on a grid (SLURM etc).
 The original code was forked from https://github.com/comp-int-hum/oida-image-extraction and was authored by Tom 
 Lippincott in the [department of computer science at JHU](https://engineering.jhu.edu/faculty/thomas-lippincott/).
 
-Additional updates,features and pipeline stages were made by:
+Additional updates, features, and pipeline stages were made by:
 - [Tim Sanders, Digital Research and Curation Center JHU](https://www.library.jhu.edu/staff/tim-sanders/)

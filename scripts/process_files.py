@@ -212,7 +212,8 @@ if __name__ == "__main__":
     parser.add_argument("--log_file",
                         dest="log_file",
                         help="Overrides the parameter `process_log_file` in the process_config.yaml. Include the full "
-                             "path and file name e.g. /output/logfile.txt")
+                             "path and file name e.g. /output/logfile.txt. Note that the paths do not automatically get"
+                             "created and will have to exist prior on the file system.")
     parser.add_argument("--config_file",
                         dest="config_file",
                         help="Overrides the default location of the process_config.yaml.")
@@ -236,6 +237,9 @@ if __name__ == "__main__":
         if os.path.join(config['data_input']['input_dir']):
             args.input_dir = 'TRUE'
             args.inputs.append(os.path.join(config['data_input']['input_dir']))
+
+    if not args.inputs and os.path.join(config['data_input']['input_dir']):
+        args.inputs.append(os.path.join(config['data_input']['input_dir']))
 
     if args.partial_load_query and not args.partial_load_root_dir:
         # add timestamp to output name for partial loads
