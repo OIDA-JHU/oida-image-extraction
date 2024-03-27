@@ -2,23 +2,22 @@
 
 ## Introduction
 These set of scripts: `process_files.py`, `filter_files.py`, and `dedup_images.py` are part of the first stage of the
-OIDA Image Collection data pipeline. They can be run independently, but are designed to process the images from Excel
-and Powerpoint documents in the Opioid Internet Document Archive and be prepared, analyzed, and curated by researchers.
+OIDA Image Collection data pipeline. These scripts be run independently, but are designed to work together in preparing 
+images for the OIDA Image Collection AI/ML and image curation.
 
 The steps below are what have been run on the initial Image Collection and are the recommended steps if replicating this
-process is needed. The output from the previous step will be the input of the following step.
+part of the data pipeline is needed. The output from the previous step will be the input of the following step.
 
-1) Extract Images: Executing the script `scripts/process_files.py` all images will be extracted from the documents 
-provided.
-2) Filter Images: Executing the script `scripts/filter_files.py` will select only the images with the provided 
-arguments.
+1) Extract Images: Executing the script `scripts/process_files.py` will extract images from the documents that are
+provided as input.
+2) Filter Images: Executing the script `scripts/filter_files.py` will select only the images within the provide input.
 3) Deduplication: Executing the script `scripts/dedup_images.py` will remove duplicate images based on a MD5 file hash. 
-Running this step after filtering will improve overall performance as this step is more time-consuming than filtering.
+Running this step after filtering will improve overall performance as this step is more time-consuming than filtering. 
 **NOTE** There is an important step that is added in the deduplication phase which is the 
 assignment of a UUID for an image. If adding new images to the collection, partial loading will need to be implemented 
-in the deduplication.
+in the deduplication. It is recommended to run this step last for performance reasons and because of the UUID 
+assignment.
 
-  
 ## Image Extraction
 The script `scripts/process_files.py` in this repository can be used to extract images from Powerpoint and Excel files 
 in both the older "CFB" Microsoft format, and the newer XML-based format (typically distinguished by an additional "x", 
@@ -124,7 +123,6 @@ debugging of the process should an error occur. The following logging files are 
 - Duplicate Images CSV: Contains all the pre/post IDs of every **duplicate** image
 
 
-
 ## Configuration
 
 ### Image Extraction Configuration
@@ -155,10 +153,37 @@ partial_load:
 
 
 ### Deduplication Configuration
-The default 
-location of the YAML is `../config/dedup_config.yaml`. This can be overridden using the `--config_file` parameter. The 
-table below is a description of the variables that can be configured for the `dedup_images.py` script. 
+The default location of the YAML is `../config/dedup_config.yaml`. This location can be overridden using 
+the `--config_file` parameter. An example configuration file:
 
+```
+data_output:
+  output_image_csv_dir: 'C:\oida_deduplicate\data'
+  process_images_csv_filename: 'processed_images.csv'
+  unique_images_csv_filename: 'unique_images.csv'
+  duplicate_images_csv_filename: 'duplicate_images.csv'
+  tmp_working_dir: 'C:\oida_deduplicate\tmp'
+  image_output_dir: 'C:\oida_deduplicate\data\image_output'
+  unique_image_output_filename: 'unique_images_output.zip'
+  duplicate_image_output_filename: 'duplicate_images_output.zip'
+  dedup_log_file_dir: 'C:\oida_deduplicate\data'
+  dedup_log_file_name: 'dedup_log_file.txt'
+```
+
+The table below is a description of the variables that can be configured for the `dedup_images.py` script. 
+
+| Variable                          | Required | Description                                                                                 |
+|-----------------------------------|----------|---------------------------------------------------------------------------------------------|
+| output_image_csv_dir              | Yes      | The location of where the CSV files containing processed, unique, and duplicate images IDs. |
+| process_images_csv_filename       | Yes      | The file name of the processed images CSV.                                                  |
+| unique_images_csv_filename        | Yes      | The file name of the unique images CSV.                                                     |
+| duplicate_images_csv_filename     | Yes      | The file name of the duplicate images CSV.                                                  |
+| tmp_working_dir                   | Yes      | Temporary working directory that is needed for processing the files.                        |
+| image_output_dir                  | Yes      | The location where the image output zip files will be persisted.                            |
+| unique_image_output_filename      | Yes      | The file name where the unique images zip file will be persisted.                           |
+| duplicate_image_output_filename   | Yes      | The file name where the duplicate images zip file will be persisted.                        |
+| dedup_log_file_dir                | Yes      | The location where the log file of INFO logging messages                                    |
+| dedup_log_file_name               | Yes      | The file name of the log file of INFO logging messages                                      |
 
 
 ## Known Issues and Extending the Code
