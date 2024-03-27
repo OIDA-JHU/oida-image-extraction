@@ -8,10 +8,10 @@ images for the OIDA Image Collection AI/ML and image curation.
 The steps below are what have been run on the initial Image Collection and are the recommended steps if replicating this
 part of the data pipeline is needed. The output from the previous step will be the input of the following step.
 
-1) Extract Images: Executing the script `scripts/process_files.py` will extract images from the documents that are
+1) **Extract Images**: Executing the script `scripts/process_files.py` will extract images from the documents that are
 provided as input.
-2) Filter Images: Executing the script `scripts/filter_files.py` will select only the images within the provide input.
-3) Deduplication: Executing the script `scripts/dedup_images.py` will remove duplicate images based on a MD5 file hash. 
+2) **Filter Images**: Executing the script `scripts/filter_files.py` will select only the images within the provide input.
+3) **Deduplication**: Executing the script `scripts/dedup_images.py` will remove duplicate images based on a MD5 file hash. 
 Running this step after filtering will improve overall performance as this step is more time-consuming than filtering. 
 **NOTE** There is an important step that is added in the deduplication phase which is the 
 assignment of a UUID for an image. If adding new images to the collection, partial loading will need to be implemented 
@@ -98,7 +98,7 @@ message for details (i.e. using the "-h" switch).
 ## Deduplication
 Deduplication processes the entire corpus together as it needs to test every image for duplicates. An image is 
 considered a duplicate if another image in the corpus contains the same MD5 hash. The very first image to compare 
-against an image that is duplicate is considered the original and every following images is considered a duplicate.
+against an image that is a duplicate, is considered the original and every following images is considered a duplicate.
 
 There is an important step that is added in the deduplication phase which is the assignment of a UUID for an image. 
 Since there is a unique identifier added at this stage, partial loading will need to be implemented when adding new 
@@ -197,6 +197,13 @@ won't be meaningful.
 
 The SCons build system probably won't work out-of-the-box in arbitrary environments, but should give a decent idea of 
 how one might run the script over a massive collection on a grid (SLURM etc).
+
+## Future Work
+The following features could potentially be implemented in future releases:
+
+- Partial loading in the deduplication script
+- Ability to redact images from the corpus
+- GUI interface
 
 ## Authors
 The original code was forked from https://github.com/comp-int-hum/oida-image-extraction and was authored by Tom 
