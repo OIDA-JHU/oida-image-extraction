@@ -5,7 +5,8 @@ These set of scripts: `process_files.py`, `filter_files.py`, and `dedup_images.p
 OIDA Image Collection data pipeline. They can be run independently, but are designed to process the images from Excel
 and Powerpoint documents in the Opioid Internet Document Archive and be prepared, analyzed, and curated by researchers.
 
-The intended steps in the processing of documents are the following:
+The steps below are what have been run on the initial Image Collection and are the recommended steps if replicating this
+process is needed. The output from the previous step will be the input of the following step.
 
 1) Extract Images: Executing the script `scripts/process_files.py` all images will be extracted from the documents 
 provided.
@@ -13,6 +14,9 @@ provided.
 arguments.
 3) Deduplication: Executing the script `scripts/dedup_images.py` will remove duplicate images based on a MD5 file hash. 
 Running this step after filtering will improve overall performance as this step is more time-consuming than filtering.
+**NOTE** There is an important step that is added in the deduplication phase which is the 
+assignment of a UUID for an image. If adding new images to the collection, partial loading will need to be implemented 
+in the deduplication.
 
   
 ## Image Extraction
@@ -65,8 +69,8 @@ all cases, each image found in a given input file `FILE_NAME` is extracted with 
 remains unambiguously associated with its source (nested archives will create longer sequences that will also be unique).
 
 ### Partial Loading
-To partially process images to be prepared for loading into the Image Collection, using the `partial_load_query` 
-parameter will take an argument that is a query string, for example:
+To partially process images in preparation for loading into the Image Collection, use the `partial_load_query` 
+parameter. This parameter takes an argument that is a query string, for example:
 
 ```
 python process_files.py --output /output/output.zip --partial_load_query 
@@ -94,9 +98,36 @@ or entropy less than 6.0.  These defaults can be specified differently on the co
 message for details (i.e. using the "-h" switch).
 
 ## Deduplication
+Deduplication processes the entire corpus together as it needs to test every image for duplicates. An image is 
+considered a duplicate if another image in the corpus contains the same MD5 hash. The very first image to compare 
+against an image that is duplicate is considered the original and every following images is considered a duplicate.
+
+There is an important step that is added in the deduplication phase which is the assignment of a UUID for an image. 
+Since there is a unique identifier added at this stage, partial loading will need to be implemented if running this 
+script. 
+
+To run deduplication use the following command:
+
+```
+python scripts/dedup_images.py --output_type unique --inputs /input/filtered_files1.zip /input/filtered_files2.zip --config_file /config/dedup_config.yaml
+```
+
+In addition to the processing there are multiple logs files that assist in the management of file ID tracking and 
+debugging of the process should an error occur. The following logging files are created:
+
+- Deduplication Log:  Contains the output of the running script. Includes `INFO` level messages.
+  - YAML Config name: `dedup_log_file_name`
+- Processed Images CSV: Contains all pre/post IDs of every image that is processed, duplicates and unique images.
+  - YAML Config name: `process_images_csv_filename`
+- Unique Images CSV: Contains all pre/post IDs of every **UNIQUE** image.
+  - YAML Config name: `unique_images_csv_filename`
+- Duplicate Images CSV: Contains all the pre/post IDs of every **duplicate** image
+
 
 
 ## Configuration
+
+### Image Extraction Configuration
 Some of the parameters can be configured in the `process_config.yaml`. The script will default to `./config` to look for
 this configuration file. It can be overridden by using the `--config_file` parameter. The following is an example
 configuration file for the `process_files.py` script:
@@ -121,6 +152,13 @@ partial_load:
 | input_dir              | No                                               | Yes, by using `--input_dir`           |
 | total_files_download   | Yes, only if a partial load is being performed   | No                                    |
 | partial_load_root_dir  | No                                               | Yes, by using `partial_load_root_dir` |
+
+
+### Deduplication Configuration
+The default 
+location of the YAML is `../config/dedup_config.yaml`. This can be overridden using the `--config_file` parameter. The 
+table below is a description of the variables that can be configured for the `dedup_images.py` script. 
+
 
 
 ## Known Issues and Extending the Code
