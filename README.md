@@ -85,8 +85,7 @@ by the `--partial_load_query` parameter. Instead, use `ddudate` or `ddmudate`, a
 to `dateaddeducsf` and `datemodifieducsf`.
 
 ## Filter Files
-Given a zip file of images such as produced by the script, a filtered 
-archive can be created with:
+Given a zip file of images such as produced by the script, a filtered archive can be created with:
 
 ```
 python scripts/filter_files.py --input some_output.zip --output filtered_output.zip
@@ -102,8 +101,8 @@ considered a duplicate if another image in the corpus contains the same MD5 hash
 against an image that is duplicate is considered the original and every following images is considered a duplicate.
 
 There is an important step that is added in the deduplication phase which is the assignment of a UUID for an image. 
-Since there is a unique identifier added at this stage, partial loading will need to be implemented if running this 
-script. 
+Since there is a unique identifier added at this stage, partial loading will need to be implemented when adding new 
+images to the entire corpus.
 
 To run deduplication use the following command:
 
@@ -187,7 +186,6 @@ The table below is a description of the variables that can be configured for the
 
 
 ## Known Issues and Extending the Code
-
 It might be worthwhile to be more sophisticated about determining input file format, e.g. using magic bytes, 
 particularly if the data sources become less constrained or curated.  This could include the image-extraction stage for
 the newer formats, where each zip archive member could be tested, rather than also relying on file extensions.
