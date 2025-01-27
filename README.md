@@ -29,7 +29,7 @@ On any computer with a recent version of Python (e.g. >3.6) and Git, first clone
 into it:
 
 ```
-git clone https://github.com/comp-int-hum/oida-image-extraction.git
+git clone https://github.com/OIDA-JHU/oida-image-extraction.git
 cd oida-image-extraction
 ```
 
