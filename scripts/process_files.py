@@ -18,10 +18,37 @@ from solr_search import SolrSearch
 
 
 def load_config(config_path):
+    # First check if path is absolute
+    if not os.path.isabs(config_path):
+        # Try relative to working directory
+        working_dir_path = os.path.join(os.getcwd(), config_path)
+        if os.path.exists(working_dir_path):
+            config_path = working_dir_path
+        else:
+            # Try relative to script location
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            script_path = os.path.join(script_dir, config_path)
+            if os.path.exists(script_path):
+                config_path = script_path
+            else:
+                raise FileNotFoundError(f"Could not find config file at: {config_path}")
     with open(config_path, 'r') as file:
         loaded_data = yaml.safe_load(file)
 
     return loaded_data
+
+
+def get_config_value(config_dict, *keys, default=None):
+    """Access YAML-based config values safely, returning default if not found"""
+    if not config_dict:
+        return default
+
+    current = config_dict
+    for key in keys:
+        if not isinstance(current, dict) or key not in current:
+            return default
+        current = current[key]
+    return current
 
 
 def build_partial_load_inputs(partial_load, root_dir):
@@ -170,6 +197,9 @@ if __name__ == "__main__":
         help="Any number and mixture of Powerpoint and Excel files to process (or zip/tar files in archive mode). "
              "If specifying input_dir=TRUE, then this should be a directory.",
     )
+    parser.add_argument("--working_dir",
+                   default=os.getcwd(),
+                   help="Working directory (defaults to current directory)")
     parser.add_argument("--output",
                         dest="output",
                         help="Zip file to append extracted images to (will be created if necessary)",
@@ -202,6 +232,10 @@ if __name__ == "__main__":
                              "the system root directory.",
                         required=False
                         )
+    parser.add_argument("--cache_dir",
+                   dest="cache_dir",
+                   help="Directory for caching temporary files and Solr results during processing",
+                   required=False)
     parser.add_argument("--start", dest="start", default=0, type=int, help="Which image index to start saving at")
     parser.add_argument("--count", dest="count",  type=int, help="How many images to save")
     parser.add_argument("--image_extensions", dest="image_extensions", nargs="*", default=[".jpg", ".jpeg", ".png"])
@@ -221,34 +255,38 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Setup configuration
-    config_path = os.path.join('..', 'config', 'process_config.yaml')
+    config = {}
     if args.config_file:
-        config_path = args.config_file
-
-    config = load_config(config_path)
+        config = load_config(args.config_file)
 
     if not args.log_file:
-        args.log_file = os.path.join(config['data_output']['process_log_file'])
+       if config:
+           args.log_file = config['data_output']['process_log_file']
+       else:
+           args.log_file = 'process.log' # TODO: centralize some defaults, like filenames
 
     if not args.output:
-        args.output = os.path.join(config['data_output']['output_file'])
+        if config:
+            args.output = get_config_value(config, 'data_output', 'output_file')
+        else:
+            parser.error("--output is required when no config file is provided")
 
     if not args.input_dir:
-        if os.path.join(config['data_input']['input_dir']):
+        if config and config['data_input']['input_dir']:
             args.input_dir = 'TRUE'
-            args.inputs.append(os.path.join(config['data_input']['input_dir']))
+            args.inputs.append(config['data_input']['input_dir'])
 
-    if not args.inputs and os.path.join(config['data_input']['input_dir']):
-        args.inputs.append(os.path.join(config['data_input']['input_dir']))
+    if not args.inputs and config and config['data_input']['input_dir']:
+        args.inputs.append(config['data_input']['input_dir'])
 
     if args.partial_load_query and not args.partial_load_root_dir:
         # add timestamp to output name for partial loads
         args.output = create_file_name_with_timestamp(args.output)
 
-        if os.path.join(config['data_input']['input_dir']):
-            args.partial_load_root_dir = os.path.join(config['data_input']['input_dir'])
+        if config and config['data_input']['input_dir']:
+            args.partial_load_root_dir = config['data_input']['input_dir']
         else:
-            args.partial_load_root_dir = os.path.join("/")
+            args.partial_load_root_dir = "/"
 
 
     # Prints lots of information while running: set the log level to e.g. "WARN" 
@@ -267,7 +305,7 @@ if __name__ == "__main__":
     if args.partial_load_query:
         logging.info("Processing partial load query: %s", args.partial_load_query)
         query = SolrSearch(args.partial_load_query)
-        query.search(number=config['partial_load']['total_files_download'])
+        query.search(number=config['partial_load']['total_files_download']) #FIX THIS -- this is the num per page for Solr
         results = query.ids_and_scores
         args.inputs = build_partial_load_inputs(results, args.partial_load_root_dir)
         args.input_dir = 'TRUE'
