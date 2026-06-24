@@ -15,8 +15,27 @@ import pandas as pd
 def load_config(config_path):
     with open(config_path, 'r') as file:
         loaded_data = yaml.safe_load(file)
-
     return loaded_data
+
+
+def load_existing_hashes(csv_path):
+    """
+    Load existing hashes from a CSV file of previous deduplication runs
+    Returns a set of MD5 hashes that are known to be unique
+    """
+    if not os.path.exists(csv_path):
+        logging.info("No existing hash file found at %s", csv_path)
+        return set()
+
+    try:
+        df = pd.read_csv(csv_path)
+        if 'hash' not in df.columns:
+            logging.error("Hash column not found in existing hash file")
+            return set()
+        return set(df['hash'].unique())
+    except Exception as ex:
+        logging.error("Error loading existing hashes: %s", str(ex))
+        return set()
 
 
 def init_file_structure(file_path_config):
@@ -63,22 +82,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_type",
                         dest="output_type",
-                        help="'unique': Only save the unique files or `all': Saves both unique files and the duplicate "
+                        help="'unique': Only save the unique files or `all`: Saves both unique files and the duplicate "
                              "files. Default is unique.",
                         required=True,
                         default="unique")
     parser.add_argument("--inputs", dest="inputs", nargs="+", help="Zip archives of images to deduplicate",
                         required=True)
-
-    # TODO: Need ability to do partial data deduping. New data to be compared against what already has been processed.
-    '''
-    parser.add_argument("--total_image_corpus", dest="image_corpus",
-                        help="The entire set of images to deduplicate. This is in contrast to the input, where you may "
-                             "only want to process a subset of images, but against the whole corpus of images. If not "
-                             "specified, the input will be treated as the entire image corpus.")
-    '''
-    parser.add_argument("--config_file", dest="config_file_loc", help="Override the default location of the config "
-                                                                      "file. Include the file name in the path.")
+    parser.add_argument("--existing_hashes",
+                        dest="existing_hashes",
+                        help="CSV file containing hashes from previous deduplication runs to compare against",
+                        required=False)
+    parser.add_argument("--config_file",
+                        dest="config_file_loc",
+                        help="Override the default location of the config file. Include the file name in the path.")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -93,26 +109,26 @@ if __name__ == "__main__":
 
     config = load_config(DEFAULT_CONFIG_PATH)
 
+    # Load existing hashes if provided
+    existing_hashes = set()
+    if args.existing_hashes:
+        logging.info("Loading existing hashes from %s", args.existing_hashes)
+        existing_hashes = load_existing_hashes(args.existing_hashes)
+        logging.info("Loaded %d existing unique hashes", len(existing_hashes))
+
     PROCESS_IMAGE_FULL_PATH = os.path.join(config['data_output']['output_image_csv_dir'],
                                            config['data_output']['process_images_csv_filename'])
-
     UNIQUE_IMAGE_FULL_PATH = os.path.join(config['data_output']['output_image_csv_dir'],
                                           config['data_output']['unique_images_csv_filename'])
-
     DUPLICATE_IMAGE_FULL_PATH = os.path.join(config['data_output']['output_image_csv_dir'],
                                              config['data_output']['duplicate_images_csv_filename'])
-
     LOG_FILE = os.path.join(config['data_output']['dedup_log_file_dir'],
                             config['data_output']['dedup_log_file_name'])
-
     ZIP_UNIQUE_IMAGE_OUTPUT = os.path.join(config['data_output']['image_output_dir'],
                                            config['data_output']['unique_image_output_filename'])
-
     ZIP_DUPLICATE_IMAGE_OUTPUT = os.path.join(config['data_output']['image_output_dir'],
                                               config['data_output']['duplicate_image_output_filename'])
-
     IMAGE_OUTPUT_DIR = os.path.join(config['data_output']['image_output_dir'])
-
     TMP_WRK = os.path.join(config['data_output']['tmp_working_dir'])
 
     # count all errors
@@ -135,7 +151,6 @@ if __name__ == "__main__":
     logging.info("Starting MD5 hash computing: " + format_duration(time.time() - start_time))
     matched_hashes_pd = pd.DataFrame()
     for zip_path in args.inputs:
-
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             # Iterate over each item
             for entry in zip_ref.infolist():
@@ -160,11 +175,10 @@ if __name__ == "__main__":
                         hash = str(hash_md5.hexdigest())
 
                         new_record = pd.Series([name,
-                                                image_id,
-                                                ext,
-                                                hash
-                                                ],
-                                               index=image_df.columns)
+                                              image_id,
+                                              ext,
+                                              hash],
+                                             index=image_df.columns)
 
                         image_df = pd.concat([image_df, pd.DataFrame([new_record])], ignore_index=True)
                     except Exception as ex:
@@ -172,10 +186,20 @@ if __name__ == "__main__":
                         error_cnt = error_cnt + 1
 
     logging.info("Finished computing MD5 hashes run time: " + format_duration(time.time() - start_time))
-    # get all the unique images into a DF
-    image_unique_df = image_df.drop_duplicates(subset=['hash'])
 
-    # get all the duplicated images into a DF
+    # Check for duplicates against existing hashes first
+    if existing_hashes:
+        image_df['is_duplicate_with_existing'] = image_df['hash'].isin(existing_hashes)
+        logging.info("Found %d images that match existing hashes",
+                    image_df['is_duplicate_with_existing'].sum())
+
+    # Get unique images (those not in existing hashes and not duplicates in current batch)
+    if existing_hashes:
+        image_unique_df = image_df[~image_df['is_duplicate_with_existing']].drop_duplicates(subset=['hash'])
+    else:
+        image_unique_df = image_df.drop_duplicates(subset=['hash'])
+
+    # Get all duplicated images
     image_dup_mask = ~image_df['image_id'].isin(image_unique_df['image_id'])
     image_dup_df = image_df[image_dup_mask]
 
@@ -191,6 +215,9 @@ if __name__ == "__main__":
     logging.info("Total images processed: %s", len(image_df))
     logging.info("Total unique images: %s", len(image_unique_df))
     logging.info("Total duplicates found: %s", len(image_dup_df))
+    if existing_hashes:
+        logging.info("Total duplicates matching existing hashes: %s",
+                    image_df['is_duplicate_with_existing'].sum())
     logging.info("Total errors: %s", error_cnt)
 
     # cleanup temp dir
